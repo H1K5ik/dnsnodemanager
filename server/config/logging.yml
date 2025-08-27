@@ -1,0 +1,9 @@
+level: "info"
+file: "logs/app.log"
+maxSize: "10m"
+maxFiles: 5
+logSql: false
+auditRetentionDays: 30
+web:
+  rotate: "1d"
+  accessLogPath: "./logs"

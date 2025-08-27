@@ -1,0 +1,11 @@
+{
+  "a": "A Record",
+  "aaaa": "AAAA Record",
+  "cname": "CNAME Record",
+  "ptr": "PTR Record",
+  "mx": "MX Record",
+  "ns": "NS Record",
+  "txt": "TXT Record",
+  "srv": "SRV Record",
+  "custom": "Custom Record"
+}

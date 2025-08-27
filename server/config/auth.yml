@@ -1,0 +1,13 @@
+local:
+  enabled: true
+  users:
+    - username: "admin"
+      password: "admin123"
+      role: "sysadmin"
+
+activeDirectory:
+  enabled: false
+  url: "ldap://your-domain-controller"
+  baseDN: "DC=yourdomain,DC=com"
+  username: "service-account"
+  password: "service-password"
