@@ -112,11 +112,19 @@ export default function DnsRecordManager(props) {
   }
 
   function getRecords() {
-    api.getDnsRecords(id).then(setRecords);
+    api.getDnsRecords(id).then(result => {
+      if (result !== false) {
+        setRecords(result);
+      }
+    });
   }
 
   function getZoneInfo() {
-    api.getDnsZone(id).then(setZoneInfo);
+    api.getDnsZone(id).then(result => {
+      if (result !== false) {
+        setZoneInfo(result);
+      }
+    });
   }
 
   function getZoneInfoAndRecords() {

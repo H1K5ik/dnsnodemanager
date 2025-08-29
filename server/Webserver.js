@@ -21,10 +21,10 @@ module.exports = {
   },
 
   async serveFrontend() {
-    this.server.use('/', express.static(path.join(__dirname, '../output_test/build')));
+    this.server.use('/', express.static(path.join(__dirname, '../frontend/build')));
     // Catch-all route for production
     this.server.get('/*', function(req, res) {
-      res.sendFile(path.join(__dirname, '../output_test/build/index.html'), function(err) {
+      res.sendFile(path.join(__dirname, '../frontend/build/index.html'), function(err) {
         if(err) res.status(500).send(err);
       });
     });
@@ -52,6 +52,4 @@ module.exports = {
       });
     }
   }
-
-
 }

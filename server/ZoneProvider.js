@@ -30,7 +30,17 @@ module.exports = class ZoneProvider {
                   .leftJoin('forwarder', 'forwarder.ID', 'zone.forwarder_group')
                   .select('zone.*', 'forwarder.members AS forwarders', 'forwarder.name AS forwarders_name')
                   .first();
+    
+    if (!zone) {
+      throw new Error(`Zone with ID ${zoneID} not found`);
+    }
+    
     const server = await this.db.raw('SELECT managed FROM server WHERE ID = (SELECT server_id FROM ns_group_member WHERE `group_id` = ? AND `primary` = 1)', [zone.ns_group]);
+    
+    if (!server || !server[0]) {
+      throw new Error(`No primary server found for ns_group ${zone.ns_group}`);
+    }
+    
     const acls = await this.db('acl_usage').where({user_id: zone.ID, type: 'dynamic_update'});
     zone.managed = server[0].managed;
     zone.dynamicUpdates = Boolean(acls.length);
@@ -45,7 +55,17 @@ module.exports = class ZoneProvider {
   preview = async zoneID => {
     // ToDo :: silly hack/workaround. reorganize stuff.
     const zone = await this.db('zone').where('ID', parseInt(zoneID)).first();
+    
+    if (!zone) {
+      throw new Error(`Zone with ID ${zoneID} not found`);
+    }
+    
     const serverData = await this.db('server').join('ns_group_member', 'ns_group_member.server_id', 'server.ID').where({'ns_group_member.primary':1, 'ns_group_member.group_id': zone.ns_group}).first();
+    
+    if (!serverData) {
+      throw new Error(`No primary server found for ns_group ${zone.ns_group}`);
+    }
+    
     const server = new ManagedServer(this.db);
     server.setFromObject(serverData);
     await server.loadDnsDetails();

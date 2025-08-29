@@ -100,7 +100,7 @@ export default function ServerManager(props) {
 
   return (
     <>
-      <ContentHeader title="Manage Nameservers asdasdasdasd">
+      <ContentHeader title="Manage Nameservers">
         <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<InfoIcon />} onClick={() => { setGuideOpen(true); }}>Managed Config Guide</Button>
         <Dialog open={guideOpen} onClose={() => { setGuideOpen(false); }}>
           <DialogTitle>Managed Config Guide</DialogTitle>
@@ -136,8 +136,8 @@ export default function ServerManager(props) {
               <TableCell>Server Name</TableCell>
               <TableCell>NS FQDN</TableCell>
               <TableCell>IP Address</TableCell>
-              <TableCell>Type sadasdasd</TableCell>
-              <TableCell>Status sadasdasd</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>SSH Health</TableCell>
               <TableCell>Config Sync</TableCell>
             </TableRow>

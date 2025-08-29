@@ -274,16 +274,31 @@ module.exports = class ManagedServer {
       await this.installConfigFile(ssh, local_file, `${this.getConfigPath()}/${this.configFileName}`);
       for( i = 0; i < zoneFiles.length; i++ ) {
         await this.installZoneFile(ssh, zoneFiles[i]);
-        try { fs.unlinkSync(`./tmp/${zoneFile.filename}`); }
-        catch(e) { console.log(`Failed to delete temporary zonefile ./tmp/${zoneFile.filename}`); }
+        const tmpFilePath = `./tmp/${zoneFiles[i].filename}`;
+        try { 
+          if (fs.existsSync(tmpFilePath)) {
+            fs.unlinkSync(tmpFilePath);
+          }
+        }
+        catch(e) { console.log(`Failed to delete temporary zonefile ${tmpFilePath}: ${e.message}`); }
       }
     } else {
       throw Error('Couldnt establish ssh connection to ' + server.ssh_host);
     }
+    
+    // Clean up temporary config file
+    try {
+      if (fs.existsSync(local_file)) {
+        fs.unlinkSync(local_file);
+      }
+    } catch(e) {
+      console.log(`Failed to delete temporary config file ${local_file}: ${e.message}`);
+    }
+    
     // Reload dns server
     await this.reloadServer(ssh);
     // Update config sync flag
-    await this.db('server').where('ID', server.ID).update({update_required: 0, last_status: 1});
+    await this.db('server').where('ID', server.ID).update({update_required: 0, last_status: 1});    
     return true;
   }
 

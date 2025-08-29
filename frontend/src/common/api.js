@@ -31,10 +31,10 @@ export default function useAPI() {
       notifier.setNotification("error", "Error in API communication");
       return false;
     }
-    // Reload page after unsuccessful query
+    // Handle unsuccessful query without reloading page, зачем ты блять постоянно обновлял страницы
     if( response.data.hasOwnProperty('success') && ! response.data.success ) {
-      window.location.reload();
-      return [];
+      notifier.setNotification("error", response.data.message || "API request failed");
+      return false;
     }
     return response.data.data;
   }
