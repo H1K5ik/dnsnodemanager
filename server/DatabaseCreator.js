@@ -1,72 +1,162 @@
+const bcrypt = require('bcrypt');
+
 async function DatabaseCreator(db) {
-  await db.raw("CREATE TABLE acl (ID INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR (100), members TEXT)");
-  await db.raw("CREATE TABLE acl_usage (type VARCHAR (20), acl_id INTEGER REFERENCES acl (ID), user_id INTEGER)");
-  await db.raw("CREATE TABLE forwarder (ID INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR (100), members TEXT)");
-  await db.raw("CREATE TABLE ns_group (ID INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR (100))");
-  await db.raw("CREATE TABLE ns_group_member (server_id INTEGER REFERENCES server (ID), group_id  INTEGER REFERENCES ns_group (ID), hidden BOOLEAN DEFAULT (0), [primary] BOOLEAN DEFAULT (0), source_id INT REFERENCES server (ID), PRIMARY KEY (server_id, group_id))");
-  await db.raw("CREATE TABLE record (ID INTEGER PRIMARY KEY AUTOINCREMENT, zone_id INTEGER REFERENCES zone (ID), name VARCHAR (253), type VARCHAR (10), data VARCHAR (253), ttl INTEGER)");
-  await db.raw(`CREATE TABLE server (
-    ID              INTEGER       PRIMARY KEY AUTOINCREMENT,
-    name            VARCHAR (100) NOT NULL,
-    dns_fqdn        VARCHAR (254),
-    dns_ip          VARCHAR (15)  NOT NULL,
-    managed         BOOLEAN,
-    active          BOOLEAN       DEFAULT (1),
-    ssh_host        VARCHAR (250),
-    ssh_user        VARCHAR (50),
-    ssh_pass        VARCHAR (250),
-    config_path     VARCHAR (200),
-    last_status     BOOLEAN,
-    last_connection TEXT,
-    last_sync       TEXT,
-    update_required BOOLEAN       DEFAULT (0)
-  )`);
-  await db.raw(`CREATE TABLE user (
-    ID     INTEGER      PRIMARY KEY AUTOINCREMENT,
-    name   VARCHAR (50),
-    secret TEXT,
-    role   VARCHAR (50)
-  )`);
-  await db.raw(`CREATE TABLE [view] (
-    name        VARCHAR       PRIMARY KEY,
-    ttl         INTEGER       DEFAULT (3600),
-    soa_rname   VARCHAR (250) DEFAULT [hostmaster.example.org],
-    soa_refresh INTEGER       DEFAULT (86400),
-    soa_retry   INTEGER       DEFAULT (7200),
-    soa_expire  INTEGER       DEFAULT (3600000),
-    soa_ttl     INTEGER       DEFAULT (1800),
-    config      TEXT          DEFAULT ('')
-  )`);
-  await db.raw(`CREATE TABLE zone (
-    ID              INTEGER       PRIMARY KEY AUTOINCREMENT,
-    [view]          VARCHAR       DEFAULT [default]
-                                  REFERENCES [view] (name),
-    fqdn            VARCHAR (255),
-    type            VARCHAR       DEFAULT authoritative,
-    ns_group        INTEGER       REFERENCES ns_group (ID),
-    forwarder_group INTEGER,
-    comment         VARCHAR (255),
-    config          TEXT,
-    soa_rname       VARCHAR (255),
-    soa_serial      INTEGER       DEFAULT (1),
-    soa_refresh     INTEGER,
-    soa_retry       INTEGER,
-    soa_expire      INTEGER,
-    soa_ttl         INTEGER,
-    ttl             INTEGER,
-    frozen          BOOLEAN       DEFAULT (0),
-    last_mod        TEXT
-  )`);
-  await db.raw(`CREATE TABLE audit (
-    timestamp DATETIME      DEFAULT (CURRENT_TIMESTAMP),
-    user      VARCHAR (100),
-    role      VARCHAR (30),
-    method    VARCHAR (10),
-    [action]  VARCHAR (100),
-    data      TEXT
-  )`);
-  await db('user').insert({name: 'admin', secret: '$2a$10$/5ipabGT3LeTJQiMnUs/zuF9O9vPkhg4C5p1JGrvTKpn.7yeiqioC', role: 'sysadmin'}); // pass: dnsnmadmin1
-  await db('view').insert({name: 'default'});
+  // Create independent tables first (no foreign keys)
+  
+  // ACL table
+  if (!(await db.schema.hasTable('acl'))) {
+    await db.schema.createTable('acl', table => {
+      table.increments('ID').primary();
+      table.string('name', 100);
+      table.text('members');
+    });
+  }
+
+  // Forwarder table
+  if (!(await db.schema.hasTable('forwarder'))) {
+    await db.schema.createTable('forwarder', table => {
+      table.increments('ID').primary();
+      table.string('name', 100);
+      table.text('members');
+    });
+  }
+
+  // NS Group table
+  if (!(await db.schema.hasTable('ns_group'))) {
+    await db.schema.createTable('ns_group', table => {
+      table.increments('ID').primary();
+      table.string('name', 100);
+    });
+  }
+
+  // Server table
+  if (!(await db.schema.hasTable('server'))) {
+    await db.schema.createTable('server', table => {
+      table.increments('ID').primary();
+      table.string('name', 100).notNullable();
+      table.string('dns_fqdn', 254);
+      table.string('dns_ip', 15).notNullable();
+      table.boolean('managed');
+      table.boolean('active').defaultTo(true);
+      table.string('ssh_host', 250);
+      table.string('ssh_user', 50);
+      table.string('ssh_pass', 250);
+      table.string('config_path', 200);
+      table.boolean('last_status');
+      table.text('last_connection');
+      table.text('last_sync');
+      table.boolean('update_required').defaultTo(false);
+    });
+  }
+
+  // User table
+  if (!(await db.schema.hasTable('user'))) {
+    await db.schema.createTable('user', table => {
+      table.increments('ID').primary();
+      table.string('name', 50);
+      table.text('secret');
+      table.string('role', 50);
+    });
+  }
+
+  // View table
+  if (!(await db.schema.hasTable('view'))) {
+    await db.schema.createTable('view', table => {
+      table.string('name', 255).primary();
+      table.integer('ttl').defaultTo(3600);
+      table.string('soa_rname', 250).defaultTo('hostmaster.example.org');
+      table.integer('soa_refresh').defaultTo(86400);
+      table.integer('soa_retry').defaultTo(7200);
+      table.integer('soa_expire').defaultTo(3600000);
+      table.integer('soa_ttl').defaultTo(1800);
+      table.text('config');
+    });
+  }
+
+  // Create dependent tables (with foreign keys)
+  
+  // ACL Usage table
+  if (!(await db.schema.hasTable('acl_usage'))) {
+    await db.schema.createTable('acl_usage', table => {
+      table.string('type', 20);
+      table.integer('acl_id').unsigned().references('ID').inTable('acl');
+      table.integer('user_id');
+    });
+  }
+
+  // NS Group Member table
+  if (!(await db.schema.hasTable('ns_group_member'))) {
+    await db.schema.createTable('ns_group_member', table => {
+      table.integer('server_id').unsigned().references('ID').inTable('server');
+      table.integer('group_id').unsigned().references('ID').inTable('ns_group');
+      table.boolean('hidden').defaultTo(false);
+      table.boolean('primary').defaultTo(false);
+      table.integer('source_id').unsigned().references('ID').inTable('server');
+      table.primary(['server_id', 'group_id']);
+    });
+  }
+
+  // Zone table
+  if (!(await db.schema.hasTable('zone'))) {
+    await db.schema.createTable('zone', table => {
+      table.increments('ID').primary();
+      table.string('view', 255).defaultTo('default').references('name').inTable('view');
+      table.string('fqdn', 255);
+      table.string('type', 50).defaultTo('authoritative');
+      table.integer('ns_group').unsigned().references('ID').inTable('ns_group');
+      table.integer('forwarder_group');
+      table.string('comment', 255);
+      table.text('config');
+      table.string('soa_rname', 255);
+      table.integer('soa_serial').defaultTo(1);
+      table.integer('soa_refresh');
+      table.integer('soa_retry');
+      table.integer('soa_expire');
+      table.integer('soa_ttl');
+      table.integer('ttl');
+      table.boolean('frozen').defaultTo(false);
+      table.timestamp('last_mod').defaultTo(db.fn.now());
+    });
+  }
+
+  // Record table
+  if (!(await db.schema.hasTable('record'))) {
+    await db.schema.createTable('record', table => {
+      table.increments('ID').primary();
+      table.integer('zone_id').unsigned().references('ID').inTable('zone');
+      table.string('name', 253);
+      table.string('type', 10);
+      table.string('data', 253);
+      table.integer('ttl');
+    });
+  }
+
+  // Audit table
+  if (!(await db.schema.hasTable('audit'))) {
+    await db.schema.createTable('audit', table => {
+      table.timestamp('timestamp').defaultTo(db.fn.now());
+      table.string('user', 100);
+      table.string('role', 30);
+      table.string('method', 10);
+      table.string('action', 100);
+      table.text('data');
+    });
+  }
+
+  // Insert default data only if not exists
+  const existingAdmin = await db('user').where('name', 'admin').first();
+  if (!existingAdmin) {
+    const defaultAdminHash = bcrypt.hashSync('admin123', 10);
+    await db('user').insert({name: 'admin', secret: defaultAdminHash, role: 'sysadmin'});
+    console.log("Admin user created");
+  }
+  
+  const existingView = await db('view').where('name', 'default').first();
+  if (!existingView) {
+    await db('view').insert({name: 'default'});
+    console.log("Default view created");
+  }
+  
   return true;
 }
 

@@ -4,8 +4,9 @@ const yaml = require('yaml');
 
 module.exports = {
   async init() {
-    this.logging = yaml.parse(fs.readFileSync('config/logging.yml', 'utf8'));
-    this.auth = yaml.parse(fs.readFileSync('config/auth.yml', 'utf8'));
-    this.web = yaml.parse(fs.readFileSync('config/web.yml', 'utf8'));
+    const configDir = path.join(__dirname, 'config');
+    this.logging = yaml.parse(fs.readFileSync(path.join(configDir, 'logging.yml'), 'utf8'));
+    this.auth = yaml.parse(fs.readFileSync(path.join(configDir, 'auth.yml'), 'utf8'));
+    this.web = yaml.parse(fs.readFileSync(path.join(configDir, 'web.yml'), 'utf8'));
   }
 }

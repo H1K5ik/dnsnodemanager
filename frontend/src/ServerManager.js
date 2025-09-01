@@ -160,7 +160,7 @@ export default function ServerManager(props) {
               <HealthCheckSection success={healthCheckData.confDirWritable} label="Configuration directory writabl" detail="Configured directory must be writable for the management user" />
               <HealthCheckSection success={healthCheckData.groupMembership} label="Bind/Named group membership" detail="The management user must be member of either 'bind' or 'named' group" />
               <HealthCheckSection success={healthCheckData.rndcCommands} label="RNDC commands executable" detail="Trying to execute '/usr/sbin/rndc status' to verify rndc function" />
-            </>
+             </>
           ) }
         </DialogContent>
         <DialogActions>

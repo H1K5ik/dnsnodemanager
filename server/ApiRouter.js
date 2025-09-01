@@ -64,14 +64,24 @@ module.exports = {
       } );
     });
 
-    router.get('/STATS', APP.auth.ensureLogin, (request, response) => {
-      APP.database.knex.raw(`SELECT
-        (SELECT COUNT(*) FROM view) AS viewCount,
-        (SELECT COUNT(*) FROM zone) AS zoneCount,
-        (SELECT COUNT(*) FROM record) AS recordCount,
-        (SELECT COUNT(*) FROM server) AS serverCount`).then( data => {
-          APP.api.dataResponse(response, data[0]);
-        } );
+    router.get('/STATS', APP.auth.ensureLogin, async (request, response) => {
+      try {
+        const [viewCount] = await APP.database.knex('view').count('* as count');
+        const [zoneCount] = await APP.database.knex('zone').count('* as count');
+        const [recordCount] = await APP.database.knex('record').count('* as count');
+        const [serverCount] = await APP.database.knex('server').count('* as count');
+        
+        const stats = {
+          viewCount: viewCount.count,
+          zoneCount: zoneCount.count,
+          recordCount: recordCount.count,
+          serverCount: serverCount.count
+        };
+        
+        APP.api.dataResponse(response, stats);
+      } catch (error) {
+        APP.api.handleApiError(response, error);
+      }
     });
 
     // Servers

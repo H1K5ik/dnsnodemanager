@@ -35,7 +35,12 @@ module.exports = class ZoneProvider {
       throw new Error(`Zone with ID ${zoneID} not found`);
     }
     
-    const server = await this.db.raw('SELECT managed FROM server WHERE ID = (SELECT server_id FROM ns_group_member WHERE `group_id` = ? AND `primary` = 1)', [zone.ns_group]);
+    const server = await this.db('server')
+      .select('server.managed')
+      .join('ns_group_member', 'ns_group_member.server_id', 'server.ID')
+      .where('ns_group_member.group_id', zone.ns_group)
+      .where('ns_group_member.primary', 1)
+      .first();
     
     if (!server || !server[0]) {
       throw new Error(`No primary server found for ns_group ${zone.ns_group}`);

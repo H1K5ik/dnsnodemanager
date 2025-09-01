@@ -54,7 +54,14 @@ module.exports = class ViewProvider {
     const zones = await this.db('zone').where('view', data.name);
     const ids = [...new Set(zones.map(row => row.ns_group))];
     for( let id of ids ) await APP.api.nsGroupProvider.queueConfigSync(id);
-    await this.db.raw('DELETE FROM record WHERE zone_id IN (SELECT ID FROM zone WHERE view = ?)', [data.name]);
+    
+    // Delete records for zones in this view
+    await this.db('record')
+      .whereIn('zone_id', 
+        this.db('zone').select('ID').where('view', data.name)
+      )
+      .del();
+      
     await this.db('zone').where('view', data.name).del();
     await this.db('view').where('name', data.name).del();
     return "View was deleted";

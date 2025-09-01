@@ -136,11 +136,26 @@ module.exports = class NsGroupProvider {
     return "Primary role changed";
   }
 
-  queueConfigSync = (groupID, primaryOnly) => {
+  queueConfigSync = async (groupID, primaryOnly) => {
     if( primaryOnly ) {
-      return this.db.raw('UPDATE server SET update_required = 1 WHERE managed = 1 AND ID IN (SELECT server_id FROM ns_group_member WHERE `primary` = 1 AND group_id = ?)', [groupID]);
+      return this.db('server')
+        .where('managed', 1)
+        .whereIn('ID', 
+          this.db('ns_group_member')
+            .select('server_id')
+            .where('primary', 1)
+            .where('group_id', groupID)
+        )
+        .update('update_required', 1);
     } else {
-      return this.db.raw('UPDATE server SET update_required = 1 WHERE managed = 1 AND ID IN (SELECT server_id FROM ns_group_member WHERE group_id = ?)', [groupID]);
+      return this.db('server')
+        .where('managed', 1)
+        .whereIn('ID', 
+          this.db('ns_group_member')
+            .select('server_id')
+            .where('group_id', groupID)
+        )
+        .update('update_required', 1);
     }
   }
 

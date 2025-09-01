@@ -30,7 +30,14 @@ module.exports = class AclProvider {
     if( rs.length ) throw Error("acl name already exists");
     // update group
     await this.db('acl').where('ID', data.ID).update({name: data.name, members: data.members});
-    const zones = await this.db.raw('SELECT zone.ns_group FROM zone, acl_usage WHERE acl_usage.acl_id = ? AND acl_usage.type = ? AND acl_usage.user_id = zone.ID', [data.ID, 'dynamic_update']);
+    
+    // Get zones using this ACL for dynamic updates
+    const zones = await this.db('zone')
+      .select('zone.ns_group')
+      .join('acl_usage', 'acl_usage.user_id', 'zone.ID')
+      .where('acl_usage.acl_id', data.ID)
+      .where('acl_usage.type', 'dynamic_update');
+      
     for( let zone of zones ) await APP.api.nsGroupProvider.queueConfigSync(zone.ns_group);
     return "ACL updated";
   }

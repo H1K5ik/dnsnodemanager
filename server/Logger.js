@@ -15,16 +15,20 @@ module.exports = {
     });
     APP.webserver.server.use(logger('combined', { stream: accessLogStream }));
 
-    // Audit log cleanup
-    setInterval(this.cleanupAuditLog, 24*3600*1000);
-    setTimeout(this.cleanupAuditLog, 600*1000);
+    
 
   },
 
   cleanupAuditLog() {
-    APP.database.knex('audit').whereRaw(`strftime('%s', 'now') - strftime('%s', timestamp) > ${APP.config.logging.auditRetentionDays} * 24 * 3600`).del().then( rs => {
-      console.log(`Ran audit log cleanup (retention period: ${APP.config.logging.auditRetentionDays} days) and deleted ${rs} records.`);
-    } );
+    const daysInSeconds = APP.config.logging.auditRetentionDays * 24 * 3600;
+    const cutoffDate = new Date(Date.now() - (daysInSeconds * 1000));
+    
+    APP.database.knex('audit')
+      .where('timestamp', '<', cutoffDate)
+      .del()
+      .then(rs => {
+        console.log(`Ran audit log cleanup (retention period: ${APP.config.logging.auditRetentionDays} days) and deleted ${rs} records.`);
+      });
   },
 
   addAuditLog(method, action, data, user, role) {
