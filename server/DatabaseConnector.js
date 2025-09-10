@@ -19,8 +19,7 @@ module.exports = {
     }
 
     await this.connect();
-    await this.checkDatabase();
-    await this.upgrade();
+    await this.runMigrations();
   },
 
   async connect() {
@@ -73,44 +72,24 @@ module.exports = {
     });
   },
 
-  async checkDatabase() {
+  async runMigrations() {
     try {
-      // Check if all required tables exist using Knex schema
-      const requiredTables = ['acl', 'user', 'server', 'zone', 'view', 'audit'];
-      const existingTables = [];
+      console.log("Running database migrations...");
       
-      for (const table of requiredTables) {
-        if (await this.knex.schema.hasTable(table)) {
-          existingTables.push(table);
-        }
-      }
+      const knexfile = require('./knexfile');
+      const knexConfig = knexfile.development;
       
-      const missingTables = requiredTables.filter(table => !existingTables.includes(table));
+      const migrationKnex = require('knex')(knexConfig);
       
-      if (missingTables.length > 0) {
-        console.log(`Missing tables: ${missingTables.join(', ')}`);
-        await this.setup();
-      } else {
-        console.log("All required database tables found, skipping initialization");
-      }
+      await migrationKnex.migrate.latest();
+      console.log("Database migrations completed successfully");
+      
+      await migrationKnex.destroy();
+      
     } catch (error) {
-      console.error("Database connection error:", error.message);
+      console.error("Migration error:", error.message);
       throw error;
     }
-  },
-
-  async setup() {
-    console.log("Initializing new database layout...");
-    const databaseCreator = require('./DatabaseCreator');
-    const result = await databaseCreator(this.knex);
-    console.log("Done! New database layout created :)");
-    return result;
-  },
-
-  async upgrade() {
-    // 0.4.1
-    //  fixes bug in 0.4.0
-    await this.knex('zone').whereNot('type', 'forward').update('forwarder_group', null);
   }
 
 }

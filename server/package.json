@@ -5,7 +5,13 @@
   "main": "index.js",
   "bin": "index.js",
   "scripts": {
-    "start": "nodemon index.js"
+    "start": "nodemon index.js",
+    "migrate:latest": "knex migrate:latest",
+    "migrate:rollback": "knex migrate:rollback",
+    "migrate:make": "knex migrate:make",
+    "migrate:status": "knex migrate:status",
+    "seed:make": "knex seed:make",
+    "seed:run": "knex seed:run"
   },
   "keywords": [],
   "author": "",

@@ -5,7 +5,6 @@ const BindParser = require('./BindParser');
 const BindZoneFile = require('./BindZoneFile');
 
 module.exports = class ManagedServer {
-
   configFileName = 'managedconfig.conf';
 
   db = null;
