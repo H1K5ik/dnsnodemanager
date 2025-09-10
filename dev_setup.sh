@@ -6,8 +6,8 @@ echo "=== DNS Node Manager - Dev Setup ==="
 if ! command -v mysql &> /dev/null; then
     echo "MySQL не установлен!"
     echo "Установите MySQL:"
-    echo "  Fedora/RHEL: sudo dnf install mysql-server"
-    echo "  Ubuntu/Debian: sudo apt install mysql-server"
+    echo "Fedora/RHEL: sudo dnf install mysql-server"
+    echo "Ubuntu/Debian: sudo apt install mysql-server"
     exit 1
 fi
 
@@ -38,7 +38,7 @@ if [ "$NODE_VERSION" -lt 22 ]; then
     exit 1
 fi
 
-echo "✅ Node.js найден: $(node --version) (v$NODE_VERSION.x)"
+echo "Node.js найден: $(node --version) (v$NODE_VERSION.x)"
 
 if [ ! -f "server/config/database.yml" ]; then
     echo " Создаю конфиг базы данных..."
@@ -91,7 +91,7 @@ else
     read -p "Нажмите Enter после настройки MySQL..."
 fi
 
-echo "📦 Устанавливаю зависимости..."
+echo "Устанавливаю зависимости..."
 npm install
 
 if [ $? -eq 0 ]; then

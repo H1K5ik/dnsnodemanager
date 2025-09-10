@@ -90,6 +90,7 @@ function NsGroupMemberRow(props) {
 // *****
 // ToDo: Rewrite to function component
 // *****
+
 export default class NsGroupRow extends React.Component {
 
   state = {
@@ -136,7 +137,6 @@ export default class NsGroupRow extends React.Component {
       } );
       this.setState({members: members, availableServers: availableServers});
     } );
-
   }
 
   // Members functions

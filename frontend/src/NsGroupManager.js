@@ -11,6 +11,7 @@ import TableCell from '@material-ui/core/TableCell';
 import LinearProgress from '@material-ui/core/LinearProgress';
 import Button from '@material-ui/core/Button';
 import AddCircle from '@material-ui/icons/AddCircle';
+import BuildIcon from '@material-ui/icons/Build';
 
 import ContentHeader from './ContentHeader';
 import NsGroupRow from './NsGroupRow';
@@ -67,10 +68,21 @@ export default function NsGroupManager(props) {
     api.deleteNsGroup(group).then(updateNsGroups);
   }
 
+  function autoFixPrimary() {
+    setBusy(true);
+    api.autoFixNsGroupPrimary().then(result => {
+      if (result) {
+        setBusy(false);
+        updateNsGroups();
+      }
+    });
+  }
+
   return (
     <>
       <ContentHeader title="Nameserver Groups">
         <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={toggleDialog}>Add Nameserver Group</Button>
+        <Button variant="contained" color="secondary" disabled={!canEdit || busy} startIcon={<BuildIcon />} onClick={autoFixPrimary} style={{marginLeft: 10}}>Auto-Fix Primary Servers</Button>
         <NsGroupDialog new defaultName="" open={addGroupDialog.open} blocked={busy} onClose={toggleDialog} onInput={handleDialogInput} onSubmit={addGroup} />
       </ContentHeader>
       <TableContainer component={Paper}>

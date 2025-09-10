@@ -86,8 +86,18 @@ module.exports = class NsGroupProvider {
     // already member?
     rs = await this.db('ns_group_member').where('server_id', data.server_id).andWhere('group_id', data.group_id);
     if( rs.length ) throw Error("server is already member of group");
-    // insert member
-    await this.db('ns_group_member').insert({ server_id: data.server_id, group_id: data.group_id });
+    
+    // Check if this is the first server in the group
+    const existingMembers = await this.db('ns_group_member').where('group_id', data.group_id);
+    const isFirstServer = existingMembers.length === 0;
+    
+    // insert member with primary flag if it's the first server
+    await this.db('ns_group_member').insert({ 
+      server_id: data.server_id, 
+      group_id: data.group_id,
+      primary: isFirstServer 
+    });
+    
     await this.queueConfigSync(data.group_id);
     await this.touchZones(data.group_id);
     return "Server added to group";
@@ -129,9 +139,17 @@ module.exports = class NsGroupProvider {
     // member exists?
     const rs = await this.db('ns_group_member').where({server_id: data.server_id, group_id: data.group_id});
     if( ! rs.length ) throw Error("invalid group member identifier");
-    // update database
+    
+    // Check if there are any existing primary servers
+    const existingPrimary = await this.db('ns_group_member')
+      .where('group_id', data.group_id)
+      .where('primary', 1)
+      .first();
+    
+    // update database - first reset all to false, then set the new one to true
     await this.db('ns_group_member').where({group_id: data.group_id}).update({primary: false});
     await this.db('ns_group_member').where({server_id: data.server_id, group_id: data.group_id}).update({primary: true});
+    
     await this.queueConfigSync(data.group_id);
     return "Primary role changed";
   }
@@ -161,6 +179,44 @@ module.exports = class NsGroupProvider {
 
   touchZones = groupID => {
     return this.db('zone').increment('soa_serial').where('ns_group', groupID);
+  }
+
+  // Auto-fix groups without primary servers
+  autoFixPrimaryServers = async () => {
+    try {
+      // Find all groups
+      const groups = await this.db('ns_group').select('*');
+      
+      for (const group of groups) {
+        // Check if group has any primary server
+        const primaryServer = await this.db('ns_group_member')
+          .where('group_id', group.ID)
+          .where('primary', 1)
+          .first();
+        
+        if (!primaryServer) {
+          // Find first available server in the group
+          const firstServer = await this.db('ns_group_member')
+            .where('group_id', group.ID)
+            .first();
+          
+          if (firstServer) {
+            // Set the first server as primary
+            await this.db('ns_group_member')
+              .where('server_id', firstServer.server_id)
+              .where('group_id', group.ID)
+              .update({primary: true});
+            
+            console.log(`Auto-fixed: Server ${firstServer.server_id} set as primary for group ${group.ID}`);
+          }
+        }
+      }
+      
+      return "Primary servers auto-fixed";
+    } catch (error) {
+      console.error('Error in autoFixPrimaryServers:', error);
+      throw error;
+    }
   }
 
 }

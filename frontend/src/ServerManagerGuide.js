@@ -45,7 +45,9 @@ export default function ServerManagerGuide(props) {
       <p>Create a directory for configuration files that is owned by the new user and the bind group and writable by both. You can freely choose the directory path, but keep in mind that SELinux or AppArmor may restrict you to use some subpath of the default config location.</p>
       <CodeBlock>
         mkdir --mode=775 /etc/{getUser()}/managed<br />
-        chown dnsmanager:{getUser()} /etc/{getUser()}/managed
+        mkdir --mode=775 /etc/{getUser()}/managed/zones<br />
+        chown dnsmanager:{getUser()} /etc/{getUser()}/managed<br />
+        chown dnsmanager:{getUser()} /etc/{getUser()}/managed/zones
       </CodeBlock>
       <p>Install the ssh key to the users authorized_keys file. Use the SSH KEY INFO button to retrieve the key from DnsNM.</p>
       <CodeBlock>
@@ -57,6 +59,7 @@ export default function ServerManagerGuide(props) {
       <p>Now you can add the server to the server manager.</p>
       <p>Make sure that the DnsNM host can connect to your managed DNS nodes and login through ssh. Consider firewall restrictions, tcpwrappers and user/group restrictions in sshd_config.</p>
       <p>After the first configuration sync, <b>include the deployed file (managedconfig.conf) in your main named.conf</b> file.</p>
+      <p><b>Note:</b> Zone files will be automatically created in the <code>/etc/{getUser()}/managed/zones/</code> directory. The system will create this directory automatically if it doesn't exist.</p>
     </>
   );
 }

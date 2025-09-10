@@ -42,12 +42,12 @@ module.exports = class ZoneProvider {
       .where('ns_group_member.primary', 1)
       .first();
     
-    if (!server || !server[0]) {
+    if (!server) {
       throw new Error(`No primary server found for ns_group ${zone.ns_group}`);
     }
     
     const acls = await this.db('acl_usage').where({user_id: zone.ID, type: 'dynamic_update'});
-    zone.managed = server[0].managed;
+    zone.managed = server.managed;
     zone.dynamicUpdates = Boolean(acls.length);
     zone.dynamicUpdatesAcls = acls.map(acl => acl.acl_id);
     return zone;
@@ -91,8 +91,7 @@ module.exports = class ZoneProvider {
     if( ! APP.util.validateZoneComment(data.comment) ) throw Error("comment must have < 250 characters");
     // validate zone type
     if( ! ['authoritative', 'forward', 'stub'].includes(data.type) ) throw Error("invalid zone type");
-    // validate nsgroup
-    const myNsGroup = await this.db('ns_group').where('ID', data.ns_group);
+    // validate nsgroupz
     if( ! myNsGroup.length ) throw Error("invalid ns group identifier");
     // validate fwdgroup
     if( data.type === 'forward' ) {
@@ -256,7 +255,7 @@ module.exports = class ZoneProvider {
     await server.setFromId(serverID);
     const success = await server.syncZone(data.fqdn, data.view);
     if( success ) {
-      const remoteFile  = `${server.getConfigPath()}/${data.fqdn}.${data.view}.db`;
+      const remoteFile  = `${server.getConfigPath()}/zones/${data.fqdn}.${data.view}.db`;
       const sshCon = await server.createConnection();
       const fileContent = await server.getRemoteFileContents(sshCon, remoteFile);
       const parser = new BindParser();
