@@ -1,7 +1,10 @@
+const ConfigSaver = require('./ConfigSaver');
+
 module.exports = class NsGroupProvider {
 
   constructor(db) {
     this.db = db;
+    this.configSaver = new ConfigSaver(db);
   }
 
   list = () => {
@@ -50,7 +53,12 @@ module.exports = class NsGroupProvider {
     const rs = await this.db('ns_group').where('name', data.name);
     if( rs.length > 0 ) throw Error("group name already exists");
     // insert
-    await this.db('ns_group').insert({ name: data.name });
+    const insertResult = await this.db('ns_group').insert({ name: data.name });
+    const groupId = insertResult[0];
+    
+    const groupData = { ID: groupId, name: data.name };
+    await this.configSaver.saveNsGroupConfig(groupData, []);
+    
     return "Nameserver group added";
   }
 
@@ -63,6 +71,11 @@ module.exports = class NsGroupProvider {
     if( rs.length ) throw Error("Another group with this name already exists");
     // update table
     await this.db('ns_group').where({ID: data.ID}).update({name: data.name});
+    
+    const updatedGroup = await this.db('ns_group').where('ID', data.ID).first();
+    const members = await this.getMembers(data.ID);
+    await this.configSaver.saveNsGroupConfig(updatedGroup, members);
+    
     return "Nameserver group updated";
   }
 
@@ -97,6 +110,10 @@ module.exports = class NsGroupProvider {
       group_id: data.group_id,
       primary: isFirstServer 
     });
+    
+    const groupData = await this.db('ns_group').where('ID', data.group_id).first();
+    const members = await this.getMembers(data.group_id);
+    await this.configSaver.saveNsGroupConfig(groupData, members);
     
     await this.queueConfigSync(data.group_id);
     await this.touchZones(data.group_id);
@@ -150,6 +167,10 @@ module.exports = class NsGroupProvider {
     await this.db('ns_group_member').where({group_id: data.group_id}).update({primary: false});
     await this.db('ns_group_member').where({server_id: data.server_id, group_id: data.group_id}).update({primary: true});
     
+    const groupData = await this.db('ns_group').where('ID', data.group_id).first();
+    const members = await this.getMembers(data.group_id);
+    await this.configSaver.saveNsGroupConfig(groupData, members);
+    
     await this.queueConfigSync(data.group_id);
     return "Primary role changed";
   }
@@ -180,7 +201,7 @@ module.exports = class NsGroupProvider {
   touchZones = groupID => {
     return this.db('zone').increment('soa_serial').where('ns_group', groupID);
   }
-
+  // херня by ии, можно потом удалить
   // Auto-fix groups without primary servers
   autoFixPrimaryServers = async () => {
     try {

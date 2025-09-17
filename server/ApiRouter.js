@@ -9,6 +9,7 @@ const ZoneProvider = require('./ZoneProvider');
 const AclProvider = require('./AclProvider');
 const FwdGroupProvider = require('./FwdGroupProvider');
 const UserProvider = require('./UserProvider');
+const ConfigSaver = require('./ConfigSaver');
 
 module.exports = {
 
@@ -24,6 +25,7 @@ module.exports = {
     this.aclProvider = new AclProvider(APP.database.knex);
     this.fwdGroupProvider = new FwdGroupProvider(APP.database.knex);
     this.userProvider = new UserProvider(APP.database.knex);
+    this.configSaver = new ConfigSaver(APP.database.knex);
 
     // Authentication Routes
     router.post('/LOGIN', APP.auth.checkLoginFields, APP.auth.processLocalLogin, APP.auth.processADLogin, APP.auth.failLogin);
@@ -122,6 +124,10 @@ module.exports = {
     router.post('/FWDGROUP', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.fwdGroupProvider.add));
     router.patch('/FWDGROUP', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.fwdGroupProvider.update));
     router.delete('/FWDGROUP', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.fwdGroupProvider.delete));
+
+    // Config Statistics
+    router.get('/CONFIG/STATS', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getConfigStats.bind(this)));
+    router.get('/CONFIG/CLEANUP', APP.auth.ensureRole('sysadmin'), this.processActionAsync(this.cleanupConfigs.bind(this)));
 
     // Zones n Records
     router.get('/ZONES', APP.auth.ensureLogin, this.processRequestAsync(this.zoneProvider.list));
@@ -294,6 +300,31 @@ module.exports = {
       });
     }
     return zones;
+  }
+
+  // Методы для работы с конфигурациями
+  getConfigStats = async () => {
+    try {
+      const stats = this.configSaver.getConfigStats();
+      return {
+        success: true,
+        data: stats
+      };
+    } catch (error) {
+      console.error('Error getting config stats:', error);
+      throw error;
+    }
+  }
+
+  cleanupConfigs = async (data) => {
+    try {
+      const keepVersions = data.keepVersions || 10;
+      this.configSaver.cleanupOldConfigs(keepVersions);
+      return "Old configurations cleaned up";
+    } catch (error) {
+      console.error('Error cleaning up configs:', error);
+      throw error;
+    }
   }
 
 }

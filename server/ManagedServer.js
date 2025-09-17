@@ -3,6 +3,7 @@ const NodeSSH = require('node-ssh').NodeSSH;
 const BindConfig = require('./BindConfig');
 const BindParser = require('./BindParser');
 const BindZoneFile = require('./BindZoneFile');
+const ConfigSaver = require('./ConfigSaver');
 
 module.exports = class ManagedServer {
 
@@ -17,6 +18,7 @@ module.exports = class ManagedServer {
 
   constructor(db) {
     this.db = db;
+    this.configSaver = new ConfigSaver(db);
   }
 
   getConfigPath() {
@@ -212,6 +214,43 @@ module.exports = class ManagedServer {
     return true;
   }
 
+  async deleteZoneFiles(ssh, zones) {
+    const deletedFiles = [];
+    const errors = [];
+    
+    for (const zone of zones) {
+      try {
+        const zoneFileName = `${zone.fqdn}.${zone.view || 'default'}.db`;
+        const remoteFile = `${this.getConfigPath()}/zones/${zoneFileName}`;
+        
+        const checkFile = await ssh.execCommand(`test -f ${remoteFile} && echo "exists" || echo "not_found"`);
+        
+        if (checkFile.stdout.trim() === 'exists') {
+          const deleteResult = await ssh.execCommand(`rm -f ${remoteFile}`);
+          
+          if (deleteResult.code === 0) {
+            deletedFiles.push(zoneFileName);
+            console.log(`Successfully deleted zone file: ${remoteFile}`);
+          } else {
+            errors.push(`Failed to delete ${zoneFileName}: ${deleteResult.stderr}`);
+            console.error(`Failed to delete zone file ${remoteFile}:`, deleteResult.stderr);
+          }
+        } else {
+          console.log(`Zone file ${remoteFile} not found, skipping deletion`);
+        }
+      } catch (error) {
+        errors.push(`Error processing zone ${zone.fqdn}: ${error.message}`);
+        console.error(`Error deleting zone file for ${zone.fqdn}:`, error);
+      }
+    }
+    
+    return {
+      deletedFiles,
+      errors,
+      success: errors.length === 0
+    };
+  }
+
   async forceConfigSync(input) {
     let i, file, rs, zone, zoneFile, fileContents, parser, rollout;
     const server = this.info;
@@ -221,8 +260,7 @@ module.exports = class ManagedServer {
     const tmpDir = './tmp';
     if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true });
-    }
-    // Fetch and prepare zone data
+    
     const zones = await this.getServerZones();
     const masterZones = zones.filter(zone => Boolean(zone.primary) && zone.type === 'authoritative').map( zone => {
       zone.dynamic = Boolean(this.acls.filter(acl => zone.primary && acl.user_id === zone.ID).length);
@@ -236,7 +274,11 @@ module.exports = class ManagedServer {
       zones[i].dynamicUpdaters = this.acls.filter(acl => zones[i].primary && acl.user_id === zones[i].ID).map(acl => acl.members).join(',').split(',');
       config.addZone(zones[i]);
     }
-    fs.writeFileSync(local_file, config.buildConfigFile());
+    const bindConfigContent = config.buildConfigFile();
+    fs.writeFileSync(local_file, bindConfigContent);
+    
+    await this.configSaver.saveServerFullConfig(server, zones, bindConfigContent);
+    
     // Build zone files
     const zoneFiles = [];
     if( masterZones.length > 0 ) {

@@ -4,3 +4,4 @@ frontend/build
 server/logs/
 server/data
 server/tmp
+tmp
