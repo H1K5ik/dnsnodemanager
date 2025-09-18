@@ -1,10 +1,7 @@
-const ConfigSaver = require('./ConfigSaver');
-
 module.exports = class AclProvider {
 
   constructor(db) {
     this.db = db;
-    this.configSaver = new ConfigSaver(db);
   }
 
   list = () => {
@@ -19,12 +16,7 @@ module.exports = class AclProvider {
     const rs = await this.db('acl').where('name', data.name.trim());
     if( rs.length ) throw Error("acl name already exists");
     // insert acl
-    const insertResult = await this.db('acl').insert({ name: data.name.trim(), members: data.members });
-    const aclId = insertResult[0];
-    
-    const aclData = { ID: aclId, name: data.name.trim(), members: data.members };
-    await this.configSaver.saveAclConfig(aclData);
-    
+    await this.db('acl').insert({ name: data.name.trim(), members: data.members });
     return "ACL created";
   }
 
@@ -38,9 +30,6 @@ module.exports = class AclProvider {
     if( rs.length ) throw Error("acl name already exists");
     // update group
     await this.db('acl').where('ID', data.ID).update({name: data.name, members: data.members});
-    
-    const updatedAcl = await this.db('acl').where('ID', data.ID).first();
-    await this.configSaver.saveAclConfig(updatedAcl);
     
     // Get zones using this ACL for dynamic updates
     const zones = await this.db('zone')

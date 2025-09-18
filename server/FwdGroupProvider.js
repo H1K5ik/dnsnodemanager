@@ -1,10 +1,7 @@
-const ConfigSaver = require('./ConfigSaver');
-
 module.exports = class AclProvider {
 
   constructor(db) {
     this.db = db;
-    this.configSaver = new ConfigSaver(db);
   }
 
   list = () => {
@@ -20,12 +17,7 @@ module.exports = class AclProvider {
     const rs = await this.db('forwarder').where('name', data.name);
     if( rs.length ) throw Error("forwarder group name already exists");
     // insert zone
-    const insertResult = await this.db('forwarder').insert({ name: data.name, members: data.members });
-    const groupId = insertResult[0];
-    
-    const groupData = { ID: groupId, name: data.name, members: data.members };
-    await this.configSaver.saveFwdGroupConfig(groupData);
-    
+    await this.db('forwarder').insert({ name: data.name, members: data.members });
     return "Forwarder Group created"
   }
 
@@ -39,10 +31,6 @@ module.exports = class AclProvider {
     if( rs.length > 0 ) throw Error("forwarder group name already exists");
     // update group
     await this.db('forwarder').where('ID', data.ID).update({name: data.name, members: data.members});
-    
-    const updatedGroup = await this.db('forwarder').where('ID', data.ID).first();
-    await this.configSaver.saveFwdGroupConfig(updatedGroup);
-    
     // config sync
     const zones = await this.db('zone').where('forwarder_group', data.ID);
     const groupIDs = [...new Set(zones.map(zone => zone.ns_group))];

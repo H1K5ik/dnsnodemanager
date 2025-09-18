@@ -1,11 +1,9 @@
 const ManagedServer = require('./ManagedServer');
-const ConfigSaver = require('./ConfigSaver');
 
 module.exports = class ServerProvider {
 
   constructor(db) {
     this.db = db;
-    this.configSaver = new ConfigSaver(db);
   }
 
   list = () => {
@@ -55,12 +53,7 @@ module.exports = class ServerProvider {
     data.config_path = data.config_path.replace(/\/$/, '');
     // todo: ssh cred validation?
     // add to database
-    const insertResult = await this.db('server').insert({...data, update_required: data.managed ? 1 : 0});
-    const serverId = insertResult[0];
-    
-    const serverData = { ID: serverId, ...data, update_required: data.managed ? 1 : 0 };
-    await this.configSaver.saveServerConfig(serverData);
-    
+    await this.db('server').insert({...data, update_required: data.managed ? 1 : 0});
     return "Server added";
   }
 
@@ -87,10 +80,6 @@ module.exports = class ServerProvider {
     // Update database
     Object.keys(data).forEach((key) => updatableKeys.includes(key) || delete data[key]);
     await this.db('server').where('ID', id).update(data);
-    
-    const updatedServer = await this.db('server').where('ID', id).first();
-    await this.configSaver.saveServerConfig(updatedServer);
-    
     return "Server information updated";
   }
 
