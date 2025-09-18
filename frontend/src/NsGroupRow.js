@@ -129,13 +129,9 @@ export default class NsGroupRow extends React.Component {
   updateMembers = () => {
     this.setState({members: null});
     this.props.api.getNsGroupMembers(this.props.data.ID).then( members => {
-      let availableServers = this.props.servers.filter( srv => {
-        for(let i = 0; i < members.length; i++) {
-          if( members[i].server_id === srv.ID ) return false;
-        }
-        return true;
+      this.props.api.getAvailableServers().then( availableServers => {
+        this.setState({members: members, availableServers: availableServers});
       } );
-      this.setState({members: members, availableServers: availableServers});
     } );
   }
 

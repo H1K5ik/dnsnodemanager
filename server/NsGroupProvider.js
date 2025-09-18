@@ -42,6 +42,19 @@ module.exports = class NsGroupProvider {
       .where('ns_group_member.group_id', id);
   }
 
+  getAvailableServers = async () => {
+    const usedServerIds = await this.db('ns_group_member').distinct('server_id');
+    const usedIds = usedServerIds.map(row => row.server_id);
+    
+    if (usedIds.length === 0) {
+      return this.db('server').select('ID', 'name', 'dns_ip', 'managed');
+    }
+    
+    return this.db('server')
+      .select('ID', 'name', 'dns_ip', 'managed')
+      .whereNotIn('ID', usedIds);
+  }
+
   add = async data => {
     if( ! data.hasOwnProperty('name') ) throw Error("missing key in input data object");
     data.name = data.name.trim();
@@ -83,9 +96,16 @@ module.exports = class NsGroupProvider {
     if( ! rs.length ) throw Error("server id does not exist");
     rs = await this.db('ns_group').where('ID', data.group_id);
     if( ! rs.length ) throw Error("group id does not exist");
-    // already member?
+    // already member of this group?
     rs = await this.db('ns_group_member').where('server_id', data.server_id).andWhere('group_id', data.group_id);
     if( rs.length ) throw Error("server is already member of group");
+    
+    // Check if server is already member of ANY other group
+    rs = await this.db('ns_group_member').where('server_id', data.server_id);
+    if( rs.length ) {
+      const existingGroup = await this.db('ns_group').where('ID', rs[0].group_id).first();
+      throw Error(`server is already member of group '${existingGroup.name}'`);
+    }
     
     // Check if this is the first server in the group
     const existingMembers = await this.db('ns_group_member').where('group_id', data.group_id);
