@@ -160,6 +160,12 @@ module.exports = class NsGroupProvider {
 
   deleteMember = async data => {
     if( ! APP.util.validateKeys(['server_id', 'group_id'], data) ) throw Error("missing key in input data object");
+    
+    const zones = await this.db('zone').where('ns_group', data.group_id);
+    if( zones.length > 0 ) {
+      throw Error(`Cannot remove server from group that has ${zones.length} DNS zones. Delete the zones first.`);
+    }
+    
     // can't delete primary unless it's the last server in the group
     // build this some time
     await this.db('ns_group_member').where({server_id: data.server_id, group_id: data.group_id}).del();
