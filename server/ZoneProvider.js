@@ -95,15 +95,38 @@ module.exports = class ZoneProvider {
     const myNsGroup = await this.db('ns_group').where('ID', data.ns_group);
     if( ! myNsGroup.length ) throw Error("invalid ns group identifier");
     // validate fwdgroup
+    let fwdGroupData = null;
     if( data.type === 'forward' ) {
       const myFwdGroup = await this.db('forwarder').where('ID', data.fwd_group);
       if( ! myFwdGroup.length ) throw Error("invalid forwarder group identifier");
+      fwdGroupData = myFwdGroup[0];
     }
     // zone already exists?
     const rs = await this.db('zone').where({fqdn: data.fqdn, view: data.view});
     if( rs.length > 0 ) throw Error("zone already exists in this view");
     // insert zone
     await this.db('zone').insert({fqdn: data.fqdn, ns_group: data.ns_group, forwarder_group: data.type === 'forward' ? data.fwd_group : null, view: data.view, type: data.type, comment: data.comment});
+    
+    if( data.type === 'forward' && fwdGroupData ) {
+      const ManagedServer = require('./ManagedServer');
+      const servers = await APP.api.nsGroupProvider.matrix();
+      const serverIds = [...new Set(servers.filter(server => server.group_id === data.ns_group).map(server => server.server_id))];
+      
+      for( const serverId of serverIds ) {
+        const server = new ManagedServer(this.db);
+        await server.setFromId(serverId);
+        
+        const zoneData = {
+          type: 'forward',
+          forwarders: fwdGroupData.members,
+          forwarders_name: fwdGroupData.name,
+          forwarder_group: data.fwd_group
+        };
+        
+        await server.createForwarderFileForZone(zoneData);
+      }
+    }
+    
     await APP.api.nsGroupProvider.queueConfigSync(data.ns_group);
     return "Zone added";
   }

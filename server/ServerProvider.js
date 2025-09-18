@@ -87,10 +87,10 @@ module.exports = class ServerProvider {
     if( ! data.hasOwnProperty('ID') ) throw Error("missing key in input data object");
     // server exists?
     const servers = await this.db('server').where('ID', data.ID);
-    if( ! servers ) throw Error("server does not exist");
+    if( ! servers.length ) throw Error("server does not exist");
     // member of nsgroups?
     const members = await this.db('ns_group_member').where('server_id', data.ID);
-    if( ! members ) throw Error("This server is still a member of a nameserver group");
+    if( members.length > 0 ) throw Error(`This server is still a member of ${members.length} nameserver group(s). Remove it from groups first.`);
     // execute
     await this.db('server').where('ID', data.ID).del();
     return "Server deleted";

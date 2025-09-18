@@ -39,12 +39,11 @@ module.exports = class BindConfig {
   }
 
   generateForwardZone(zone) {
-    const forwarders_array = zone.forwarders.split(',');
-    const forwarders_string = forwarders_array.join("; ");
+    const forwarderGroupName = zone.forwarders_name || `fwd_${zone.forwarder_group}`;
     return `
       zone "${zone.fqdn}" {
         type forward;
-        forwarders { ${forwarders_string}; };
+        include "${this.config_path}/zones/forward/${forwarderGroupName}.conf";
         forward only;
       };`;
   }

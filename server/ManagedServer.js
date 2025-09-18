@@ -3,6 +3,7 @@ const NodeSSH = require('node-ssh').NodeSSH;
 const BindConfig = require('./BindConfig');
 const BindParser = require('./BindParser');
 const BindZoneFile = require('./BindZoneFile');
+const BindForwarderFile = require('./BindForwarderFile');
 
 module.exports = class ManagedServer {
 
@@ -203,6 +204,48 @@ module.exports = class ManagedServer {
     return true;
   }
 
+  async installForwarderFile(ssh, forwarderFile) {
+    const remoteFile = `${this.getConfigPath()}/zones/forward/${forwarderFile.filename}`;
+    
+    await ssh.putFile(`./tmp/${forwarderFile.filename}`, remoteFile);
+    await ssh.execCommand(`chgrp ${await this.getServiceGroup(ssh)} ${remoteFile}`);
+    await ssh.execCommand(`chmod 664 ${remoteFile}`);
+
+    console.log(`Uploaded ${this.getConfigPath()}/zones/forward/${forwarderFile.filename}`);
+
+    return true;
+  }
+
+  async createForwarderFileForZone(zone) {
+    if (zone.type !== 'forward' || !zone.forwarders) {
+      return null;
+    }
+
+    const forwarder = {
+      name: zone.forwarders_name || `fwd_${zone.forwarder_group}`,
+      members: zone.forwarders,
+      id: zone.forwarder_group
+    };
+
+    const forwarderFile = new BindForwarderFile(forwarder);
+    const tmpFilePath = `./tmp/${forwarderFile.filename}`;
+    forwarderFile.writeTo(tmpFilePath);
+
+    const ssh = await this.createConnection();
+    await this.installForwarderFile(ssh, forwarderFile);
+
+    // Cleanup temporary file
+    try {
+      if (fs.existsSync(tmpFilePath)) {
+        fs.unlinkSync(tmpFilePath);
+      }
+    } catch(e) {
+      console.log(`Failed to delete temporary forwarder file ${tmpFilePath}: ${e.message}`);
+    }
+
+    return forwarderFile;
+  }
+
   async reloadServer(ssh) {
     const reloadCommand = await ssh.execCommand('rndc reload');
 
@@ -230,6 +273,7 @@ module.exports = class ManagedServer {
       zone.dynamic = Boolean(this.acls.filter(acl => zone.primary && acl.user_id === zone.ID).length);
       return zone;
     } );
+    const forwardZones = zones.filter(zone => zone.type === 'forward');
     // Build bind config file
     const config = new BindConfig(server.config_path.replace(/\/$/, ''));
     const local_file = `./tmp/server_${server.ID}.bindconf`;
@@ -294,6 +338,11 @@ module.exports = class ManagedServer {
         }
         catch(e) { console.log(`Failed to delete temporary zonefile ${tmpFilePath}: ${e.message}`); }
       }
+      
+      // Create forwarder files for forward zones не у верен в этой хуйне
+      // for( const forwardZone of forwardZones ) {
+      //   await this.createForwarderFileForZone(forwardZone);
+      // }
     } else {
       throw Error('Couldnt establish ssh connection to ' + server.ssh_host);
     }
@@ -329,7 +378,7 @@ module.exports = class ManagedServer {
       .where('ns_group_member.server_id', this.info.ID)
       .orderBy('zone.fqdn', 'asc');
     if( zoneId !== null ) query.where('zone.ID', zoneId);
-    const zones = await query.select('zone.*', 'ns_group_member.primary', 'ns_group_member.source_id', 'ns_group_member.hidden', 'forwarder.members as forwarders');
+    const zones = await query.select('zone.*', 'ns_group_member.primary', 'ns_group_member.source_id', 'ns_group_member.hidden', 'forwarder.members as forwarders', 'forwarder.name as forwarders_name');
     return zones.map( zone => {
       zone.serverID = this.info.ID;
       zone.view = this.views.find(view => view.name === zone.view);

@@ -91,6 +91,12 @@ module.exports = class NsGroupProvider {
     if( ! data.hasOwnProperty('ID') ) throw Error("missing key in input data object");
     const gid = parseInt(data.ID);
     if( ! gid ) throw Error("invalid id input");
+    
+    const zones = await this.db('zone').where('ns_group', gid);
+    if( zones.length > 0 ) {
+      throw Error(`This nameserver group is still used by ${zones.length} DNS zones. Delete the zones first.`);
+    }
+    
     await this.db('ns_group_member').where('group_id', gid).del();
     await this.db('ns_group').where('ID', gid).del();
     return "Nameserver group deleted";
