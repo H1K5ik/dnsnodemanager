@@ -256,7 +256,8 @@ module.exports = class ZoneProvider {
     await server.setFromId(serverID);
     const success = await server.syncZone(data.fqdn, data.view);
     if( success ) {
-      const remoteFile  = `${server.getConfigPath()}/zones/${data.fqdn}.${data.view}.db`;
+      const zoneTypeDir = data.type || 'authoritative';
+      const remoteFile  = `${server.getConfigPath()}/zones/${zoneTypeDir}/${data.fqdn}.${data.view}.db`;
       const sshCon = await server.createConnection();
       const fileContent = await server.getRemoteFileContents(sshCon, remoteFile);
       const parser = new BindParser();

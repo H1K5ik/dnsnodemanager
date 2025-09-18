@@ -179,10 +179,12 @@ module.exports = class ManagedServer {
   }
 
   async installZoneFile(ssh, zoneFile) {
-    const remoteFile = `${this.getConfigPath()}/zones/${zoneFile.filename}`;
+    const zoneTypeDir = zoneFile.info.type;
+    const remoteFile = `${this.getConfigPath()}/zones/${zoneTypeDir}/${zoneFile.filename}`;
     
-    // Создаем папку zones если она не существует
-    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones`);
+    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/authoritative`);
+    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/forward`);
+    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/stub`);
     
     await ssh.putFile(`./tmp/${zoneFile.filename}`, remoteFile);
     await ssh.execCommand(`chgrp ${await this.getServiceGroup(ssh)} ${remoteFile}`);
@@ -252,8 +254,9 @@ module.exports = class ManagedServer {
         }
         // Download remote zone file
         try {
-          console.log(`Downloading ${this.getConfigPath()}/zones/${zoneFile.filename} from ${this.info.name}`);
-          fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/zones/${zoneFile.filename}`);
+          const zoneTypeDir = zone.type;
+          console.log(`Downloading ${this.getConfigPath()}/zones/${zoneTypeDir}/${zoneFile.filename} from ${this.info.name}`);
+          fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/zones/${zoneTypeDir}/${zoneFile.filename}`);
           parser = new BindParser();
           parser.setContent(fileContents);
           // Check serial
@@ -275,8 +278,10 @@ module.exports = class ManagedServer {
     }
     // Push configuration to remote system
     if( ssh.isConnected() ) {
-      // Создаем папку zones на сервере
-      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones`);
+      // Создаем папки zones с подкаталогами по типам на сервере
+      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/authoritative`);
+      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/forward`);
+      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/stub`);
       
       await this.installConfigFile(ssh, local_file, `${this.getConfigPath()}/${this.configFileName}`);
       for( i = 0; i < zoneFiles.length; i++ ) {
