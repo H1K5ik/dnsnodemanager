@@ -97,6 +97,7 @@ module.exports = {
     router.get('/NSGROUPS/LIST', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.list));
     router.get('/NSGROUPS/TREE', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.tree));
     router.get('/NSGROUPS/AVAILABLE_SERVERS', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.getAvailableServers));
+    router.get('/NSGROUPS/WITH_SERVERS', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.getGroupsWithServers));
     router.get('/NSGROUP/:first/MEMBERS', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.getMembers));
     router.post('/NSGROUP/MEMBER', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.addMember));
     router.post('/NSGROUP', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.add));

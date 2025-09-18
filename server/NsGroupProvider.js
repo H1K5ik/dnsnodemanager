@@ -55,6 +55,14 @@ module.exports = class NsGroupProvider {
       .whereNotIn('ID', usedIds);
   }
 
+  getGroupsWithServers = async () => {
+    return this.db('ns_group')
+      .join('ns_group_member', 'ns_group_member.group_id', 'ns_group.ID')
+      .select('ns_group.ID', 'ns_group.name')
+      .groupBy('ns_group.ID', 'ns_group.name')
+      .orderBy('ns_group.name');
+  }
+
   add = async data => {
     if( ! data.hasOwnProperty('name') ) throw Error("missing key in input data object");
     data.name = data.name.trim();

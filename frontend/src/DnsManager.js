@@ -32,7 +32,7 @@ export default function DnsManager(props) {
   }
 
   function getNsGroups() {
-    api.getNsGroups().then(setNsGroups);
+    api.getNsGroupsWithServers().then(setNsGroups);
   }
 
   function getFwdGroups() {

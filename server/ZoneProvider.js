@@ -91,7 +91,8 @@ module.exports = class ZoneProvider {
     if( ! APP.util.validateZoneComment(data.comment) ) throw Error("comment must have < 250 characters");
     // validate zone type
     if( ! ['authoritative', 'forward', 'stub'].includes(data.type) ) throw Error("invalid zone type");
-    // validate nsgroupz
+    // validate nsgroup
+    const myNsGroup = await this.db('ns_group').where('ID', data.ns_group);
     if( ! myNsGroup.length ) throw Error("invalid ns group identifier");
     // validate fwdgroup
     if( data.type === 'forward' ) {

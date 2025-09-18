@@ -127,6 +127,9 @@ export default function useAPI() {
     getAvailableServers: () => {
       return fetchApiData("NSGROUPS/AVAILABLE_SERVERS");
     },
+    getNsGroupsWithServers: () => {
+      return fetchApiData("NSGROUPS/WITH_SERVERS");
+    },
     addNsGroup: data => {
       return postApiData("NSGROUP", data);
     },
