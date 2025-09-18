@@ -59,7 +59,7 @@ module.exports = class ServerProvider {
     const serverId = insertResult[0];
     
     const serverData = { ID: serverId, ...data, update_required: data.managed ? 1 : 0 };
-    await this.configSaver.saveServerConfig(serverData);
+    await this.configSaver.saveServerConfig(serverData, { username: data.username || 'system' });
     
     return "Server added";
   }
@@ -89,7 +89,7 @@ module.exports = class ServerProvider {
     await this.db('server').where('ID', id).update(data);
     
     const updatedServer = await this.db('server').where('ID', id).first();
-    await this.configSaver.saveServerConfig(updatedServer);
+    await this.configSaver.saveServerConfig(updatedServer, { username: data.username || 'system' });
     
     return "Server information updated";
   }

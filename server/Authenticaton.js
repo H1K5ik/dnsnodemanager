@@ -120,9 +120,9 @@ module.exports = {
     } else next();
   },
 
-  failLogin(request, response)  {
-    response.json({success: false, message: "Authentication Failed"});
-  },
+    failLogin(request, response)  {
+      response.json({success: false, message: "Authentication Failed"});
+    },
 
   processLogout(request, response) {
     request.logout();

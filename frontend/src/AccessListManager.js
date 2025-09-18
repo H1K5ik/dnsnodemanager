@@ -48,7 +48,7 @@ export default function AccessListManager(props) {
   React.useEffect(updateAcls, []); // eslint-disable-line
 
   return (
-    <>
+      <>
       <ContentHeader title="Access Lists">
         <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={() => { setAclDialogOpen(true); }}>New ACL</Button>
         <AccessListDialog new open={aclDialogOpen} onClose={() => { setAclDialogOpen(false); }} onSubmit={addAcl} />
@@ -68,7 +68,7 @@ export default function AccessListManager(props) {
         </Table>
       </TableContainer>
       { loading && ( <Box m={2}><LinearProgress /></Box> ) }
-    </>
+      </>
   );
 
 }

@@ -117,9 +117,31 @@ module.exports = class ZoneProvider {
       type: data.type, 
       comment: data.comment 
     };
-    await this.configSaver.saveZoneConfig(zoneData, []);
     
-    await APP.api.nsGroupProvider.queueConfigSync(data.ns_group);
+    // Получаем серверы из группы
+    const servers = await this.db('ns_group_member')
+      .join('server', 'ns_group_member.server_id', 'server.ID')
+      .where('ns_group_member.group_id', data.ns_group)
+      .select('server.*');
+    
+    // Получаем данные группы
+    const groupData = await this.db('ns_group').where('ID', data.ns_group).first();
+    
+    // Сохраняем зону сразу на каждый сервер в группе
+    for (const server of servers) {
+      try {
+        // Создаем ManagedServer для каждого сервера
+        const managedServer = new ManagedServer(this.db);
+        await managedServer.setFromId(server.ID);
+        
+        // Сохраняем зону сразу на сервер
+        await managedServer.saveZoneToServer(zoneData, [], { username: data.username || 'system' });
+        
+        console.log(`Zone ${zoneData.fqdn} saved immediately to server ${server.name}`);
+      } catch (error) {
+        console.error(`Error saving zone to server ${server.name}:`, error);
+      }
+    }
     return "Zone added";
   }
 
@@ -398,6 +420,27 @@ module.exports = class ZoneProvider {
     // insert record
     await this.db('record').insert({type: data.type, name: data.name, data: data.data, zone_id: data.zone_id, ttl: data.ttl});
     await this.touch(data.zone_id);
+    
+    // Получаем все записи зоны для обновления на сервере
+    const records = await this.db('record').where('zone_id', data.zone_id).orderBy('name', 'asc');
+    
+    // Получаем серверы из группы и обновляем зону на каждом
+    const servers = await this.db('ns_group_member')
+      .join('server', 'ns_group_member.server_id', 'server.ID')
+      .where('ns_group_member.group_id', rs.ns_group)
+      .select('server.*');
+    
+    for (const server of servers) {
+      try {
+        const managedServer = new ManagedServer(this.db);
+        await managedServer.setFromId(server.ID);
+        await managedServer.saveZoneToServer(rs, records, { username: data.username || 'system' });
+        console.log(`Zone ${rs.fqdn} updated on server ${server.name} after record addition`);
+      } catch (error) {
+        console.error(`Error updating zone on server ${server.name}:`, error);
+      }
+    }
+    
     return "DNS Record added";
   }
 
@@ -475,6 +518,27 @@ module.exports = class ZoneProvider {
     await this.db('record').where('ID', data.ID).update({ttl: data.ttl, data: data.data, name: data.name});
     // update serials
     await this.touch(data.zone_id);
+    
+    // Получаем все записи зоны для обновления на сервере
+    const records = await this.db('record').where('zone_id', data.zone_id).orderBy('name', 'asc');
+    
+    // Получаем серверы из группы и обновляем зону на каждом
+    const servers = await this.db('ns_group_member')
+      .join('server', 'ns_group_member.server_id', 'server.ID')
+      .where('ns_group_member.group_id', rs.ns_group)
+      .select('server.*');
+    
+    for (const server of servers) {
+      try {
+        const managedServer = new ManagedServer(this.db);
+        await managedServer.setFromId(server.ID);
+        await managedServer.saveZoneToServer(rs, records, { username: data.username || 'system' });
+        console.log(`Zone ${rs.fqdn} updated on server ${server.name} after record update`);
+      } catch (error) {
+        console.error(`Error updating zone on server ${server.name}:`, error);
+      }
+    }
+    
     return "DNS Record updated";
   }
 
@@ -500,6 +564,27 @@ module.exports = class ZoneProvider {
     let chunks = _.chunk(data, 999);
     for( let i = 0; i < chunks.length; i++ ) await this.db('record').whereIn('ID', chunks[i]).del();
     await this.touch(zone.ID);
+    
+    // Получаем все записи зоны для обновления на сервере
+    const records = await this.db('record').where('zone_id', zone.ID).orderBy('name', 'asc');
+    
+    // Получаем серверы из группы и обновляем зону на каждом
+    const servers = await this.db('ns_group_member')
+      .join('server', 'ns_group_member.server_id', 'server.ID')
+      .where('ns_group_member.group_id', zone.ns_group)
+      .select('server.*');
+    
+    for (const server of servers) {
+      try {
+        const managedServer = new ManagedServer(this.db);
+        await managedServer.setFromId(server.ID);
+        await managedServer.saveZoneToServer(zone, records, { username: 'system' });
+        console.log(`Zone ${zone.fqdn} updated on server ${server.name} after record deletion`);
+      } catch (error) {
+        console.error(`Error updating zone on server ${server.name}:`, error);
+      }
+    }
+    
     return "Records were deleted"
   }
 

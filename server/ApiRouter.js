@@ -128,6 +128,19 @@ module.exports = {
     // Config Statistics
     router.get('/CONFIG/STATS', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getConfigStats.bind(this)));
     router.get('/CONFIG/CLEANUP', APP.auth.ensureRole('sysadmin'), this.processActionAsync(this.cleanupConfigs.bind(this)));
+    router.get('/CONFIG/EXTENDED_STATS', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getExtendedConfigStats.bind(this)));
+
+    // Git Management
+    router.get('/CONFIG/GIT/HISTORY', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getGitHistory.bind(this)));
+    router.get('/CONFIG/GIT/COMMIT/:hash', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getGitCommitDetails.bind(this)));
+    router.get('/CONFIG/GIT/BRANCHES', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getGitBranches.bind(this)));
+    router.get('/CONFIG/GIT/TAGS', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getGitTags.bind(this)));
+    router.get('/CONFIG/GIT/STATS', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.getGitStats.bind(this)));
+    
+    router.post('/CONFIG/GIT/REVERT', APP.auth.ensureRole('sysadmin'), this.processActionAsync(this.revertToGitCommit.bind(this)));
+    router.post('/CONFIG/GIT/BRANCH', APP.auth.ensureRole('sysadmin'), this.processActionAsync(this.createGitBranch.bind(this)));
+    router.post('/CONFIG/GIT/SWITCH', APP.auth.ensureRole('sysadmin'), this.processActionAsync(this.switchGitBranch.bind(this)));
+    router.post('/CONFIG/GIT/TAG', APP.auth.ensureRole('sysadmin'), this.processActionAsync(this.createGitTag.bind(this)));
 
     // Zones n Records
     router.get('/ZONES', APP.auth.ensureLogin, this.processRequestAsync(this.zoneProvider.list));
@@ -300,29 +313,148 @@ module.exports = {
       });
     }
     return zones;
-  }
+  },
 
   // Методы для работы с конфигурациями
-  getConfigStats = async () => {
+  getConfigStats: async () => {
     try {
       const stats = this.configSaver.getConfigStats();
-      return {
-        success: true,
-        data: stats
-      };
+      return stats;
     } catch (error) {
       console.error('Error getting config stats:', error);
       throw error;
     }
-  }
+  },
 
-  cleanupConfigs = async (data) => {
+  cleanupConfigs: async (data) => {
     try {
       const keepVersions = data.keepVersions || 10;
       this.configSaver.cleanupOldConfigs(keepVersions);
       return "Old configurations cleaned up";
     } catch (error) {
       console.error('Error cleaning up configs:', error);
+      throw error;
+    }
+  },
+
+  getExtendedConfigStats: async () => {
+    try {
+      const stats = await this.configSaver.getExtendedStats();
+      return stats;
+    } catch (error) {
+      console.error('Error getting extended config stats:', error);
+      throw error;
+    }
+  },
+
+  // Git Management Methods
+  getGitHistory: async (data) => {
+    try {
+      const limit = data.limit || 10;
+      const history = await this.configSaver.getGitHistory(limit);
+      return history;
+    } catch (error) {
+      console.error('Error getting git history:', error);
+      throw error;
+    }
+  },
+
+  getGitCommitDetails: async (data) => {
+    try {
+      const hash = data.hash;
+      if (!hash) {
+        throw new Error('Hash is required');
+      }
+      const details = this.configSaver.getGitCommitDetails(hash);
+      return details;
+    } catch (error) {
+      console.error('Error getting git commit details:', error);
+      throw error;
+    }
+  },
+
+  getGitBranches: async () => {
+    try {
+      const branches = this.configSaver.getGitBranches();
+      return branches;
+    } catch (error) {
+      console.error('Error getting git branches:', error);
+      throw error;
+    }
+  },
+
+  getGitTags: async () => {
+    try {
+      const tags = this.configSaver.getGitTags();
+      return tags;
+    } catch (error) {
+      console.error('Error getting git tags:', error);
+      throw error;
+    }
+  },
+
+  getGitStats: async () => {
+    try {
+      const stats = await this.configSaver.getGitStats();
+      return stats;
+    } catch (error) {
+      console.error('Error getting git stats:', error);
+      throw error;
+    }
+  },
+
+  revertToGitCommit: async (data) => {
+    try {
+      const { hash, hard = false } = data;
+      if (!hash) {
+        throw new Error('Hash is required');
+      }
+      const result = await this.configSaver.revertToGitCommit(hash, hard);
+      return result;
+    } catch (error) {
+      console.error('Error reverting to git commit:', error);
+      throw error;
+    }
+  },
+
+  createGitBranch: async (data) => {
+    try {
+      const { branchName } = data;
+      if (!branchName) {
+        throw new Error('Branch name is required');
+      }
+      const result = await this.configSaver.createGitBranch(branchName);
+      return result;
+    } catch (error) {
+      console.error('Error creating git branch:', error);
+      throw error;
+    }
+  },
+
+  switchGitBranch: async (data) => {
+    try {
+      const { branchName } = data;
+      if (!branchName) {
+        throw new Error('Branch name is required');
+      }
+      const result = await this.configSaver.switchGitBranch(branchName);
+      return result;
+    } catch (error) {
+      console.error('Error switching git branch:', error);
+      throw error;
+    }
+  },
+
+  createGitTag: async (data) => {
+    try {
+      const { tagName, message = '' } = data;
+      if (!tagName) {
+        throw new Error('Tag name is required');
+      }
+      const result = await this.configSaver.createGitTag(tagName, message);
+      return result;
+    } catch (error) {
+      console.error('Error creating git tag:', error);
       throw error;
     }
   }

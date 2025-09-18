@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const NodeSSH = require('node-ssh').NodeSSH;
 const BindConfig = require('./BindConfig');
 const BindParser = require('./BindParser');
@@ -6,19 +7,15 @@ const BindZoneFile = require('./BindZoneFile');
 const ConfigSaver = require('./ConfigSaver');
 
 module.exports = class ManagedServer {
-
-  configFileName = 'managedconfig.conf';
-
-  db = null;
-  info = null;
-  serviceGroup = null;
-  acls = [];
-  views = [];
-  nameservers = [];
-
   constructor(db) {
+    this.configFileName = 'managedconfig.conf';
     this.db = db;
     this.configSaver = new ConfigSaver(db);
+    this.info = null;
+    this.serviceGroup = null;
+    this.acls = [];
+    this.views = [];
+    this.nameservers = [];
   }
 
   getConfigPath() {
@@ -251,6 +248,114 @@ module.exports = class ManagedServer {
     };
   }
 
+  /**
+   * Сохраняет зону сразу на DNS сервер
+   * @param {Object} zoneData - данные зоны
+   * @param {Array} records - записи зоны
+   * @param {Object} userInfo - информация о пользователе
+   */
+  async saveZoneToServer(zoneData, records = [], userInfo = null) {
+    const server = this.info;
+    await this.loadDnsDetails();
+    const ssh = await this.createConnection();
+
+    const zoneType = zoneData.type === 'forward' ? 'forward' : 'authority';
+    const remoteZonePath = path.join(server.config_path, 'zones', zoneType, `${zoneData.fqdn}.zone`);
+    
+    let zoneContent = '';
+    
+    if (zoneData.type === 'authoritative') {
+      // Создаем zone файл для authoritative зоны
+      const zoneFile = new BindZoneFile(zoneData, records);
+      zoneContent = zoneFile.buildZoneFile();
+    } else {
+      // Создаем конфигурацию для forward зоны
+      zoneContent = this.buildForwardZoneConfig(zoneData);
+    }
+
+    // Создаем временный файл
+    const tmpFile = `./tmp/zone_${zoneData.ID}_${Date.now()}.zone`;
+    fs.writeFileSync(tmpFile, zoneContent);
+
+    try {
+      // Загружаем файл на сервер
+      await ssh.putFile(tmpFile, remoteZonePath);
+      console.log(`Zone ${zoneData.fqdn} saved to server ${server.name} at ${remoteZonePath}`);
+      
+      // Обновляем конфигурацию bind
+      await this.updateBindConfig(ssh, zoneData);
+      
+      // Перезагружаем DNS сервер
+      await this.reloadServer(ssh);
+      
+      // Сохраняем в локальные конфигурации
+      await this.configSaver.saveZoneToServer(server, zoneData, records, userInfo);
+      
+    } finally {
+      // Удаляем временный файл
+      if (fs.existsSync(tmpFile)) {
+        fs.unlinkSync(tmpFile);
+      }
+    }
+  }
+
+  /**
+   * Создает конфигурацию для forward зоны
+   * @param {Object} zoneData - данные зоны
+   */
+  buildForwardZoneConfig(zoneData) {
+    return `zone "${zoneData.fqdn}" {
+    type forward;
+    forwarders { ${zoneData.forwarders || '8.8.8.8; 8.8.4.4;'}; };
+};
+`;
+  }
+
+  /**
+   * Обновляет конфигурацию bind для новой зоны
+   * @param {Object} ssh - SSH соединение
+   * @param {Object} zoneData - данные зоны
+   */
+  async updateBindConfig(ssh, zoneData) {
+    const server = this.info;
+    const bindConfigPath = path.join(server.config_path, 'managedconfig.conf');
+    const zoneType = zoneData.type === 'forward' ? 'forward' : 'authority';
+    const zonePath = `zones/${zoneType}/${zoneData.fqdn}.zone`;
+    
+    const zoneConfig = `
+zone "${zoneData.fqdn}" {
+    type ${zoneData.type === 'authoritative' ? 'master' : 'forward'};
+    file "${zonePath}";
+    ${zoneData.type === 'forward' ? `forwarders { ${zoneData.forwarders || '8.8.8.8; 8.8.4.4;'}; };` : ''}
+};
+`;
+
+    try {
+      // Скачиваем текущий конфиг
+      const currentConfig = await ssh.getFile(bindConfigPath);
+      
+      // Проверяем, есть ли уже эта зона в конфиге
+      if (!currentConfig.includes(`zone "${zoneData.fqdn}"`)) {
+        // Добавляем зону в конфиг
+        const updatedConfig = currentConfig + zoneConfig;
+        
+        // Создаем временный файл с обновленным конфигом
+        const tmpConfigFile = `./tmp/config_${Date.now()}.conf`;
+        fs.writeFileSync(tmpConfigFile, updatedConfig);
+        
+        // Загружаем обновленный конфиг на сервер
+        await ssh.putFile(tmpConfigFile, bindConfigPath);
+        
+        // Удаляем временный файл
+        fs.unlinkSync(tmpConfigFile);
+        
+        console.log(`Bind config updated for zone ${zoneData.fqdn}`);
+      }
+    } catch (error) {
+      console.error(`Error updating bind config for zone ${zoneData.fqdn}:`, error);
+    }
+  }
+
   async forceConfigSync(input) {
     let i, file, rs, zone, zoneFile, fileContents, parser, rollout;
     const server = this.info;
@@ -260,6 +365,7 @@ module.exports = class ManagedServer {
     const tmpDir = './tmp';
     if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true });
+    }
     
     const zones = await this.getServerZones();
     const masterZones = zones.filter(zone => Boolean(zone.primary) && zone.type === 'authoritative').map( zone => {
@@ -277,7 +383,14 @@ module.exports = class ManagedServer {
     const bindConfigContent = config.buildConfigFile();
     fs.writeFileSync(local_file, bindConfigContent);
     
-    await this.configSaver.saveServerFullConfig(server, zones, bindConfigContent);
+    await this.configSaver.saveServerFullConfig(server, zones, bindConfigContent, { username: 'system' });
+    
+    // Сохраняем каждую зону отдельно для сервера
+    for (const zone of zones) {
+      const records = zone.type === 'authoritative' && zone.primary ? 
+        await this.db('record').where('zone_id', zone.ID).orderBy('name', 'asc') : [];
+      await this.configSaver.saveServerZone(server, zone, records, { username: 'system' });
+    }
     
     // Build zone files
     const zoneFiles = [];

@@ -23,7 +23,7 @@ module.exports = class AclProvider {
     const aclId = insertResult[0];
     
     const aclData = { ID: aclId, name: data.name.trim(), members: data.members };
-    await this.configSaver.saveAclConfig(aclData);
+    await this.configSaver.saveAclConfig(aclData, { username: data.username || 'system' });
     
     return "ACL created";
   }
@@ -40,7 +40,7 @@ module.exports = class AclProvider {
     await this.db('acl').where('ID', data.ID).update({name: data.name, members: data.members});
     
     const updatedAcl = await this.db('acl').where('ID', data.ID).first();
-    await this.configSaver.saveAclConfig(updatedAcl);
+    await this.configSaver.saveAclConfig(updatedAcl, { username: data.username || 'system' });
     
     // Get zones using this ACL for dynamic updates
     const zones = await this.db('zone')

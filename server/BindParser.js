@@ -56,7 +56,7 @@ module.exports = class BindParser {
         this.soa.mname = match[2].trim();
         this.soa.rname = match[3].trim();
       } else if( inSoa ) {
-        inSoa = ! /\)/.test(line.trim());    // closing parentesis signals end of SOA record
+        inSoa = ! /\)/.test(line.trim());     
         match = /^(\d+)/.exec(line.trim());
         if( match ) this.soa.values.push(match[1]);
         if( ! inSoa ) this.soa.fqdn = `${this.soa.zone}${origin}`.replace(/\.$/, '').replace(/^@/, ''); // If end of SOA record, build proper zone fqdn

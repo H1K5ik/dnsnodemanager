@@ -55,5 +55,4 @@ module.exports = class BindZoneFile {
   writeTo(path) {
     return fs.writeFileSync(path, this.buildZoneFile());
   }
-
 }

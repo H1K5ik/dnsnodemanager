@@ -24,7 +24,7 @@ module.exports = class AclProvider {
     const groupId = insertResult[0];
     
     const groupData = { ID: groupId, name: data.name, members: data.members };
-    await this.configSaver.saveFwdGroupConfig(groupData);
+    await this.configSaver.saveFwdGroupConfig(groupData, { username: data.username || 'system' });
     
     return "Forwarder Group created"
   }
@@ -41,7 +41,7 @@ module.exports = class AclProvider {
     await this.db('forwarder').where('ID', data.ID).update({name: data.name, members: data.members});
     
     const updatedGroup = await this.db('forwarder').where('ID', data.ID).first();
-    await this.configSaver.saveFwdGroupConfig(updatedGroup);
+    await this.configSaver.saveFwdGroupConfig(updatedGroup, { username: data.username || 'system' });
     
     // config sync
     const zones = await this.db('zone').where('forwarder_group', data.ID);

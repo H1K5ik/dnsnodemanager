@@ -57,7 +57,7 @@ module.exports = class NsGroupProvider {
     const groupId = insertResult[0];
     
     const groupData = { ID: groupId, name: data.name };
-    await this.configSaver.saveNsGroupConfig(groupData, []);
+    await this.configSaver.saveNsGroupConfig(groupData, [], { username: data.username || 'system' });
     
     return "Nameserver group added";
   }
@@ -74,7 +74,7 @@ module.exports = class NsGroupProvider {
     
     const updatedGroup = await this.db('ns_group').where('ID', data.ID).first();
     const members = await this.getMembers(data.ID);
-    await this.configSaver.saveNsGroupConfig(updatedGroup, members);
+    await this.configSaver.saveNsGroupConfig(updatedGroup, members, { username: data.username || 'system' });
     
     return "Nameserver group updated";
   }
@@ -113,7 +113,19 @@ module.exports = class NsGroupProvider {
     
     const groupData = await this.db('ns_group').where('ID', data.group_id).first();
     const members = await this.getMembers(data.group_id);
-    await this.configSaver.saveNsGroupConfig(groupData, members);
+    const serverData = await this.db('server').where('ID', data.server_id).first();
+    
+    // Переносим существующие конфигурации сервера в структуру группы
+    await this.configSaver.moveServerToGroup(serverData.name, groupData.name, { username: data.username || 'system' });
+    
+    // Получаем зоны группы и сохраняем их для нового сервера
+    const zones = await this.db('zone').where('ns_group', data.group_id);
+    
+    for (const zone of zones) {
+      const records = zone.type === 'authoritative' ? 
+        await this.db('record').where('zone_id', zone.ID).orderBy('name', 'asc') : [];
+      await this.configSaver.saveGroupServerZone(groupData, serverData, zone, records, { username: data.username || 'system' });
+    }
     
     await this.queueConfigSync(data.group_id);
     await this.touchZones(data.group_id);
@@ -169,7 +181,7 @@ module.exports = class NsGroupProvider {
     
     const groupData = await this.db('ns_group').where('ID', data.group_id).first();
     const members = await this.getMembers(data.group_id);
-    await this.configSaver.saveNsGroupConfig(groupData, members);
+    await this.configSaver.saveNsGroupConfig(groupData, members, { username: data.username || 'system' });
     
     await this.queueConfigSync(data.group_id);
     return "Primary role changed";
