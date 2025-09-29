@@ -3,7 +3,7 @@ const NodeSSH = require('node-ssh').NodeSSH;
 const BindConfig = require('./BindConfig');
 const BindParser = require('./BindParser');
 const BindZoneFile = require('./BindZoneFile');
-const ConfigSaver = require('./ConfigSaver');
+const BindForwarderFile = require('./BindForwarderFile');
 
 module.exports = class ManagedServer {
 
@@ -18,7 +18,6 @@ module.exports = class ManagedServer {
 
   constructor(db) {
     this.db = db;
-    this.configSaver = new ConfigSaver(db);
   }
 
   getConfigPath() {
@@ -181,10 +180,12 @@ module.exports = class ManagedServer {
   }
 
   async installZoneFile(ssh, zoneFile) {
-    const remoteFile = `${this.getConfigPath()}/zones/${zoneFile.filename}`;
+    const zoneTypeDir = zoneFile.info.type;
+    const remoteFile = `${this.getConfigPath()}/zones/${zoneTypeDir}/${zoneFile.filename}`;
     
-    // Создаем папку zones если она не существует
-    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones`);
+    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/authoritative`);
+    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/forward`);
+    await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/stub`);
     
     await ssh.putFile(`./tmp/${zoneFile.filename}`, remoteFile);
     await ssh.execCommand(`chgrp ${await this.getServiceGroup(ssh)} ${remoteFile}`);
@@ -203,6 +204,48 @@ module.exports = class ManagedServer {
     return true;
   }
 
+  async installForwarderFile(ssh, forwarderFile) {
+    const remoteFile = `${this.getConfigPath()}/zones/forward/${forwarderFile.filename}`;
+    
+    await ssh.putFile(`./tmp/${forwarderFile.filename}`, remoteFile);
+    await ssh.execCommand(`chgrp ${await this.getServiceGroup(ssh)} ${remoteFile}`);
+    await ssh.execCommand(`chmod 664 ${remoteFile}`);
+
+    console.log(`Uploaded ${this.getConfigPath()}/zones/forward/${forwarderFile.filename}`);
+
+    return true;
+  }
+
+  async createForwarderFileForZone(zone) {
+    if (zone.type !== 'forward' || !zone.forwarders) {
+      return null;
+    }
+
+    const forwarder = {
+      name: zone.forwarders_name || `fwd_${zone.forwarder_group}`,
+      members: zone.forwarders,
+      id: zone.forwarder_group
+    };
+
+    const forwarderFile = new BindForwarderFile(forwarder);
+    const tmpFilePath = `./tmp/${forwarderFile.filename}`;
+    forwarderFile.writeTo(tmpFilePath);
+
+    const ssh = await this.createConnection();
+    await this.installForwarderFile(ssh, forwarderFile);
+
+    // Cleanup temporary file
+    try {
+      if (fs.existsSync(tmpFilePath)) {
+        fs.unlinkSync(tmpFilePath);
+      }
+    } catch(e) {
+      console.log(`Failed to delete temporary forwarder file ${tmpFilePath}: ${e.message}`);
+    }
+
+    return forwarderFile;
+  }
+
   async reloadServer(ssh) {
     const reloadCommand = await ssh.execCommand('rndc reload');
 
@@ -214,43 +257,6 @@ module.exports = class ManagedServer {
     return true;
   }
 
-  async deleteZoneFiles(ssh, zones) {
-    const deletedFiles = [];
-    const errors = [];
-    
-    for (const zone of zones) {
-      try {
-        const zoneFileName = `${zone.fqdn}.${zone.view || 'default'}.db`;
-        const remoteFile = `${this.getConfigPath()}/zones/${zoneFileName}`;
-        
-        const checkFile = await ssh.execCommand(`test -f ${remoteFile} && echo "exists" || echo "not_found"`);
-        
-        if (checkFile.stdout.trim() === 'exists') {
-          const deleteResult = await ssh.execCommand(`rm -f ${remoteFile}`);
-          
-          if (deleteResult.code === 0) {
-            deletedFiles.push(zoneFileName);
-            console.log(`Successfully deleted zone file: ${remoteFile}`);
-          } else {
-            errors.push(`Failed to delete ${zoneFileName}: ${deleteResult.stderr}`);
-            console.error(`Failed to delete zone file ${remoteFile}:`, deleteResult.stderr);
-          }
-        } else {
-          console.log(`Zone file ${remoteFile} not found, skipping deletion`);
-        }
-      } catch (error) {
-        errors.push(`Error processing zone ${zone.fqdn}: ${error.message}`);
-        console.error(`Error deleting zone file for ${zone.fqdn}:`, error);
-      }
-    }
-    
-    return {
-      deletedFiles,
-      errors,
-      success: errors.length === 0
-    };
-  }
-
   async forceConfigSync(input) {
     let i, file, rs, zone, zoneFile, fileContents, parser, rollout;
     const server = this.info;
@@ -260,12 +266,14 @@ module.exports = class ManagedServer {
     const tmpDir = './tmp';
     if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true });
-    
+    }
+    // Fetch and prepare zone data
     const zones = await this.getServerZones();
     const masterZones = zones.filter(zone => Boolean(zone.primary) && zone.type === 'authoritative').map( zone => {
       zone.dynamic = Boolean(this.acls.filter(acl => zone.primary && acl.user_id === zone.ID).length);
       return zone;
     } );
+    const forwardZones = zones.filter(zone => zone.type === 'forward');
     // Build bind config file
     const config = new BindConfig(server.config_path.replace(/\/$/, ''));
     const local_file = `./tmp/server_${server.ID}.bindconf`;
@@ -274,11 +282,7 @@ module.exports = class ManagedServer {
       zones[i].dynamicUpdaters = this.acls.filter(acl => zones[i].primary && acl.user_id === zones[i].ID).map(acl => acl.members).join(',').split(',');
       config.addZone(zones[i]);
     }
-    const bindConfigContent = config.buildConfigFile();
-    fs.writeFileSync(local_file, bindConfigContent);
-    
-    await this.configSaver.saveServerFullConfig(server, zones, bindConfigContent);
-    
+    fs.writeFileSync(local_file, config.buildConfigFile());
     // Build zone files
     const zoneFiles = [];
     if( masterZones.length > 0 ) {
@@ -294,8 +298,9 @@ module.exports = class ManagedServer {
         }
         // Download remote zone file
         try {
-          console.log(`Downloading ${this.getConfigPath()}/zones/${zoneFile.filename} from ${this.info.name}`);
-          fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/zones/${zoneFile.filename}`);
+          const zoneTypeDir = zone.type;
+          console.log(`Downloading ${this.getConfigPath()}/zones/${zoneTypeDir}/${zoneFile.filename} from ${this.info.name}`);
+          fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/zones/${zoneTypeDir}/${zoneFile.filename}`);
           parser = new BindParser();
           parser.setContent(fileContents);
           // Check serial
@@ -317,8 +322,10 @@ module.exports = class ManagedServer {
     }
     // Push configuration to remote system
     if( ssh.isConnected() ) {
-      // Создаем папку zones на сервере
-      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones`);
+      // Создаем папки zones с подкаталогами по типам на сервере
+      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/authoritative`);
+      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/forward`);
+      await ssh.execCommand(`mkdir -p ${this.getConfigPath()}/zones/stub`);
       
       await this.installConfigFile(ssh, local_file, `${this.getConfigPath()}/${this.configFileName}`);
       for( i = 0; i < zoneFiles.length; i++ ) {
@@ -331,6 +338,11 @@ module.exports = class ManagedServer {
         }
         catch(e) { console.log(`Failed to delete temporary zonefile ${tmpFilePath}: ${e.message}`); }
       }
+      
+      // Create forwarder files for forward zones не у верен в этой хуйне
+      // for( const forwardZone of forwardZones ) {
+      //   await this.createForwarderFileForZone(forwardZone);
+      // }
     } else {
       throw Error('Couldnt establish ssh connection to ' + server.ssh_host);
     }
@@ -366,7 +378,7 @@ module.exports = class ManagedServer {
       .where('ns_group_member.server_id', this.info.ID)
       .orderBy('zone.fqdn', 'asc');
     if( zoneId !== null ) query.where('zone.ID', zoneId);
-    const zones = await query.select('zone.*', 'ns_group_member.primary', 'ns_group_member.source_id', 'ns_group_member.hidden', 'forwarder.members as forwarders');
+    const zones = await query.select('zone.*', 'ns_group_member.primary', 'ns_group_member.source_id', 'ns_group_member.hidden', 'forwarder.members as forwarders', 'forwarder.name as forwarders_name');
     return zones.map( zone => {
       zone.serverID = this.info.ID;
       zone.view = this.views.find(view => view.name === zone.view);

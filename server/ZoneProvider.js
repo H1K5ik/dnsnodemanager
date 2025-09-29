@@ -3,13 +3,11 @@ const ip = require('ip');
 const ManagedServer = require('./ManagedServer');
 const BindZoneFile = require('./BindZoneFile');
 const BindParser = require('./BindParser');
-const ConfigSaver = require('./ConfigSaver');
 
 module.exports = class ZoneProvider {
 
   constructor(db) {
     this.db = db;
-    this.configSaver = new ConfigSaver(db);
   }
 
   list = async () => {
@@ -93,31 +91,41 @@ module.exports = class ZoneProvider {
     if( ! APP.util.validateZoneComment(data.comment) ) throw Error("comment must have < 250 characters");
     // validate zone type
     if( ! ['authoritative', 'forward', 'stub'].includes(data.type) ) throw Error("invalid zone type");
-    // validate nsgroupz
+    // validate nsgroup
     const myNsGroup = await this.db('ns_group').where('ID', data.ns_group);
     if( ! myNsGroup.length ) throw Error("invalid ns group identifier");
     // validate fwdgroup
+    let fwdGroupData = null;
     if( data.type === 'forward' ) {
       const myFwdGroup = await this.db('forwarder').where('ID', data.fwd_group);
       if( ! myFwdGroup.length ) throw Error("invalid forwarder group identifier");
+      fwdGroupData = myFwdGroup[0];
     }
     // zone already exists?
     const rs = await this.db('zone').where({fqdn: data.fqdn, view: data.view});
     if( rs.length > 0 ) throw Error("zone already exists in this view");
     // insert zone
-    const insertResult = await this.db('zone').insert({fqdn: data.fqdn, ns_group: data.ns_group, forwarder_group: data.type === 'forward' ? data.fwd_group : null, view: data.view, type: data.type, comment: data.comment});
-    const zoneId = insertResult[0];
+    await this.db('zone').insert({fqdn: data.fqdn, ns_group: data.ns_group, forwarder_group: data.type === 'forward' ? data.fwd_group : null, view: data.view, type: data.type, comment: data.comment});
     
-    const zoneData = { 
-      ID: zoneId, 
-      fqdn: data.fqdn, 
-      ns_group: data.ns_group, 
-      forwarder_group: data.type === 'forward' ? data.fwd_group : null, 
-      view: data.view, 
-      type: data.type, 
-      comment: data.comment 
-    };
-    await this.configSaver.saveZoneConfig(zoneData, []);
+    if( data.type === 'forward' && fwdGroupData ) {
+      const ManagedServer = require('./ManagedServer');
+      const servers = await APP.api.nsGroupProvider.matrix();
+      const serverIds = [...new Set(servers.filter(server => server.group_id === data.ns_group).map(server => server.server_id))];
+      
+      for( const serverId of serverIds ) {
+        const server = new ManagedServer(this.db);
+        await server.setFromId(serverId);
+        
+        const zoneData = {
+          type: 'forward',
+          forwarders: fwdGroupData.members,
+          forwarders_name: fwdGroupData.name,
+          forwarder_group: data.fwd_group
+        };
+        
+        await server.createForwarderFileForZone(zoneData);
+      }
+    }
     
     await APP.api.nsGroupProvider.queueConfigSync(data.ns_group);
     return "Zone added";
@@ -271,7 +279,8 @@ module.exports = class ZoneProvider {
     await server.setFromId(serverID);
     const success = await server.syncZone(data.fqdn, data.view);
     if( success ) {
-      const remoteFile  = `${server.getConfigPath()}/zones/${data.fqdn}.${data.view}.db`;
+      const zoneTypeDir = data.type || 'authoritative';
+      const remoteFile  = `${server.getConfigPath()}/zones/${zoneTypeDir}/${data.fqdn}.${data.view}.db`;
       const sshCon = await server.createConnection();
       const fileContent = await server.getRemoteFileContents(sshCon, remoteFile);
       const parser = new BindParser();
@@ -290,53 +299,11 @@ module.exports = class ZoneProvider {
   delete = async data => {
     const zones = await this.db('zone').whereIn('ID', data);
     const nsGroups = [...new Set(zones.map(zone => zone.ns_group))];
-    
-    const servers = await APP.api.nsGroupProvider.matrix();
-    const affectedServers = servers.filter(server => nsGroups.includes(server.group_id));
-    
-    const deletionResults = [];
-    for (const serverInfo of affectedServers) {
-      try {
-        const server = new ManagedServer(this.db);
-        await server.setFromId(serverInfo.server_id);
-        const ssh = await server.createConnection();
-        
-        const serverZones = zones.filter(zone => zone.ns_group === serverInfo.group_id);
-        
-        if (serverZones.length > 0) {
-          const result = await server.deleteZoneFiles(ssh, serverZones);
-          deletionResults.push({
-            server: serverInfo.server_name,
-            result: result
-          });
-          
-          if (!result.success) {
-            console.warn(`Some zone files could not be deleted from server ${serverInfo.server_name}:`, result.errors);
-          }
-        }
-        
-        ssh.dispose();
-      } catch (error) {
-        console.error(`Failed to delete zone files from server ${serverInfo.server_name}:`, error);
-        deletionResults.push({
-          server: serverInfo.server_name,
-          result: { success: false, errors: [error.message] }
-        });
-      }
-    }
-    
     for( let id of nsGroups ) await APP.api.nsGroupProvider.queueConfigSync(id);
-    
     await this.db('zone').whereIn('ID', data).del();
     await this.db('record').whereIn('zone_id', data).del();
     await this.db('acl_usage').whereIn('user_id', data).del();
-    
-    const totalErrors = deletionResults.reduce((acc, result) => acc + (result.result.errors?.length || 0), 0);
-    const message = totalErrors > 0 
-      ? `DNS zones deleted from database. ${totalErrors} file deletion errors occurred on servers.`
-      : "DNS zones and zone files deleted successfully";
-    
-    return message;
+    return "DNS zones deleted";
   }
 
   findReverseZone = async ipaddr => {

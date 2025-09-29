@@ -87,7 +87,7 @@ async function DatabaseCreator(db) {
   // NS Group Member table
   if (!(await db.schema.hasTable('ns_group_member'))) {
     await db.schema.createTable('ns_group_member', table => {
-      table.integer('server_id').unsigned().references('ID').inTable('server');
+      table.integer('server_id').unsigned().references('ID').inTable('server').unique();
       table.integer('group_id').unsigned().references('ID').inTable('ns_group');
       table.boolean('hidden').defaultTo(false);
       table.boolean('primary').defaultTo(false);

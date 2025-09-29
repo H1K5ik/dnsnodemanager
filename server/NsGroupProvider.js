@@ -1,10 +1,7 @@
-const ConfigSaver = require('./ConfigSaver');
-
 module.exports = class NsGroupProvider {
 
   constructor(db) {
     this.db = db;
-    this.configSaver = new ConfigSaver(db);
   }
 
   list = () => {
@@ -45,6 +42,27 @@ module.exports = class NsGroupProvider {
       .where('ns_group_member.group_id', id);
   }
 
+  getAvailableServers = async () => {
+    const usedServerIds = await this.db('ns_group_member').distinct('server_id');
+    const usedIds = usedServerIds.map(row => row.server_id);
+    
+    if (usedIds.length === 0) {
+      return this.db('server').select('ID', 'name', 'dns_ip', 'managed');
+    }
+    
+    return this.db('server')
+      .select('ID', 'name', 'dns_ip', 'managed')
+      .whereNotIn('ID', usedIds);
+  }
+
+  getGroupsWithServers = async () => {
+    return this.db('ns_group')
+      .join('ns_group_member', 'ns_group_member.group_id', 'ns_group.ID')
+      .select('ns_group.ID', 'ns_group.name')
+      .groupBy('ns_group.ID', 'ns_group.name')
+      .orderBy('ns_group.name');
+  }
+
   add = async data => {
     if( ! data.hasOwnProperty('name') ) throw Error("missing key in input data object");
     data.name = data.name.trim();
@@ -53,12 +71,7 @@ module.exports = class NsGroupProvider {
     const rs = await this.db('ns_group').where('name', data.name);
     if( rs.length > 0 ) throw Error("group name already exists");
     // insert
-    const insertResult = await this.db('ns_group').insert({ name: data.name });
-    const groupId = insertResult[0];
-    
-    const groupData = { ID: groupId, name: data.name };
-    await this.configSaver.saveNsGroupConfig(groupData, []);
-    
+    await this.db('ns_group').insert({ name: data.name });
     return "Nameserver group added";
   }
 
@@ -71,11 +84,6 @@ module.exports = class NsGroupProvider {
     if( rs.length ) throw Error("Another group with this name already exists");
     // update table
     await this.db('ns_group').where({ID: data.ID}).update({name: data.name});
-    
-    const updatedGroup = await this.db('ns_group').where('ID', data.ID).first();
-    const members = await this.getMembers(data.ID);
-    await this.configSaver.saveNsGroupConfig(updatedGroup, members);
-    
     return "Nameserver group updated";
   }
 
@@ -83,6 +91,12 @@ module.exports = class NsGroupProvider {
     if( ! data.hasOwnProperty('ID') ) throw Error("missing key in input data object");
     const gid = parseInt(data.ID);
     if( ! gid ) throw Error("invalid id input");
+    
+    const zones = await this.db('zone').where('ns_group', gid);
+    if( zones.length > 0 ) {
+      throw Error(`This nameserver group is still used by ${zones.length} DNS zones. Delete the zones first.`);
+    }
+    
     await this.db('ns_group_member').where('group_id', gid).del();
     await this.db('ns_group').where('ID', gid).del();
     return "Nameserver group deleted";
@@ -96,9 +110,16 @@ module.exports = class NsGroupProvider {
     if( ! rs.length ) throw Error("server id does not exist");
     rs = await this.db('ns_group').where('ID', data.group_id);
     if( ! rs.length ) throw Error("group id does not exist");
-    // already member?
+    // already member of this group?
     rs = await this.db('ns_group_member').where('server_id', data.server_id).andWhere('group_id', data.group_id);
     if( rs.length ) throw Error("server is already member of group");
+    
+    // Check if server is already member of ANY other group
+    rs = await this.db('ns_group_member').where('server_id', data.server_id);
+    if( rs.length ) {
+      const existingGroup = await this.db('ns_group').where('ID', rs[0].group_id).first();
+      throw Error(`server is already member of group '${existingGroup.name}'`);
+    }
     
     // Check if this is the first server in the group
     const existingMembers = await this.db('ns_group_member').where('group_id', data.group_id);
@@ -110,10 +131,6 @@ module.exports = class NsGroupProvider {
       group_id: data.group_id,
       primary: isFirstServer 
     });
-    
-    const groupData = await this.db('ns_group').where('ID', data.group_id).first();
-    const members = await this.getMembers(data.group_id);
-    await this.configSaver.saveNsGroupConfig(groupData, members);
     
     await this.queueConfigSync(data.group_id);
     await this.touchZones(data.group_id);
@@ -143,6 +160,12 @@ module.exports = class NsGroupProvider {
 
   deleteMember = async data => {
     if( ! APP.util.validateKeys(['server_id', 'group_id'], data) ) throw Error("missing key in input data object");
+    
+    const zones = await this.db('zone').where('ns_group', data.group_id);
+    if( zones.length > 0 ) {
+      throw Error(`Cannot remove server from group that has ${zones.length} DNS zones. Delete the zones first.`);
+    }
+    
     // can't delete primary unless it's the last server in the group
     // build this some time
     await this.db('ns_group_member').where({server_id: data.server_id, group_id: data.group_id}).del();
@@ -166,10 +189,6 @@ module.exports = class NsGroupProvider {
     // update database - first reset all to false, then set the new one to true
     await this.db('ns_group_member').where({group_id: data.group_id}).update({primary: false});
     await this.db('ns_group_member').where({server_id: data.server_id, group_id: data.group_id}).update({primary: true});
-    
-    const groupData = await this.db('ns_group').where('ID', data.group_id).first();
-    const members = await this.getMembers(data.group_id);
-    await this.configSaver.saveNsGroupConfig(groupData, members);
     
     await this.queueConfigSync(data.group_id);
     return "Primary role changed";
@@ -201,7 +220,7 @@ module.exports = class NsGroupProvider {
   touchZones = groupID => {
     return this.db('zone').increment('soa_serial').where('ns_group', groupID);
   }
-  // херня by ии, можно потом удалить
+
   // Auto-fix groups without primary servers
   autoFixPrimaryServers = async () => {
     try {

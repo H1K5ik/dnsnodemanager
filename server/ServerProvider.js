@@ -1,11 +1,9 @@
 const ManagedServer = require('./ManagedServer');
-const ConfigSaver = require('./ConfigSaver');
 
 module.exports = class ServerProvider {
 
   constructor(db) {
     this.db = db;
-    this.configSaver = new ConfigSaver(db);
   }
 
   list = () => {
@@ -55,12 +53,7 @@ module.exports = class ServerProvider {
     data.config_path = data.config_path.replace(/\/$/, '');
     // todo: ssh cred validation?
     // add to database
-    const insertResult = await this.db('server').insert({...data, update_required: data.managed ? 1 : 0});
-    const serverId = insertResult[0];
-    
-    const serverData = { ID: serverId, ...data, update_required: data.managed ? 1 : 0 };
-    await this.configSaver.saveServerConfig(serverData);
-    
+    await this.db('server').insert({...data, update_required: data.managed ? 1 : 0});
     return "Server added";
   }
 
@@ -87,10 +80,6 @@ module.exports = class ServerProvider {
     // Update database
     Object.keys(data).forEach((key) => updatableKeys.includes(key) || delete data[key]);
     await this.db('server').where('ID', id).update(data);
-    
-    const updatedServer = await this.db('server').where('ID', id).first();
-    await this.configSaver.saveServerConfig(updatedServer);
-    
     return "Server information updated";
   }
 
@@ -98,10 +87,10 @@ module.exports = class ServerProvider {
     if( ! data.hasOwnProperty('ID') ) throw Error("missing key in input data object");
     // server exists?
     const servers = await this.db('server').where('ID', data.ID);
-    if( ! servers ) throw Error("server does not exist");
+    if( ! servers.length ) throw Error("server does not exist");
     // member of nsgroups?
     const members = await this.db('ns_group_member').where('server_id', data.ID);
-    if( ! members ) throw Error("This server is still a member of a nameserver group");
+    if( members.length > 0 ) throw Error(`This server is still a member of ${members.length} nameserver group(s). Remove it from groups first.`);
     // execute
     await this.db('server').where('ID', data.ID).del();
     return "Server deleted";

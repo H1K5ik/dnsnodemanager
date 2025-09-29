@@ -24,7 +24,6 @@ export default function NsGroupManager(props) {
   const [busy, setBusy] = React.useState(false);
   const [nsLoading, setNsLoading] = React.useState(true);
   const [nsGroups, setNsGroups] = React.useState([]);
-  const [servers, setServers] = React.useState([]);
   const [addGroupDialog, setAddGroupDialog] = React.useState({open: false, data: {name: ''}});
   const api = useAPI();
 
@@ -37,10 +36,7 @@ export default function NsGroupManager(props) {
     setNsLoading(true);
     api.getNsGroups().then( nsGroups => {
       setNsGroups(nsGroups);
-      api.getServers().then( servers => {
-        setServers(servers);
-        setNsLoading(false);
-      } );
+      setNsLoading(false);
     } );
   }
 
@@ -96,7 +92,7 @@ export default function NsGroupManager(props) {
             </TableRow>
           </TableHead>
           <TableBody>
-            { nsLoading ? <></> : nsGroups.map( row => <NsGroupRow key={row.ID} servers={servers} data={row} readOnly={!canEdit} onDelete={deleteGroup} onUpdate={updateNsGroups} api={api} /> ) }
+            { nsLoading ? <></> : nsGroups.map( row => <NsGroupRow key={row.ID} data={row} readOnly={!canEdit} onDelete={deleteGroup} onUpdate={updateNsGroups} api={api} /> ) }
           </TableBody>
         </Table>
       </TableContainer>

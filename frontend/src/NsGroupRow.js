@@ -33,7 +33,7 @@ function NsGroupMemberRow(props) {
   }
 
   function getAvailableSources() {
-    return props.servers.filter( member => {
+    return props.members.filter( member => {
       return ! ( Boolean(member.primary) || props.data.server_id === member.server_id || props.data.source_id === member.server_id );
     } );
   }
@@ -69,7 +69,7 @@ function NsGroupMemberRow(props) {
       <TableCell>{props.data.dns_ip}</TableCell>
       <TableCell>{getType()}</TableCell>
       <TableCell>
-        { props.data.primary || props.servers.length < 3 ? <>Primary (default)</> : (
+        { props.data.primary || props.members.length < 3 ? <>Primary (default)</> : (
           <>
             { props.data.source_id === null ? 'Primary (default)' : props.data.source_name }
             <IconButton aria-haspopup="true" color="secondary" disabled={props.readOnly} children={<EditIcon />} onClick={e => { setSourceMenuAnchor(e.currentTarget); }} />
@@ -129,13 +129,9 @@ export default class NsGroupRow extends React.Component {
   updateMembers = () => {
     this.setState({members: null});
     this.props.api.getNsGroupMembers(this.props.data.ID).then( members => {
-      let availableServers = this.props.servers.filter( srv => {
-        for(let i = 0; i < members.length; i++) {
-          if( members[i].server_id === srv.ID ) return false;
-        }
-        return true;
+      this.props.api.getAvailableServers().then( availableServers => {
+        this.setState({members: members, availableServers: availableServers});
       } );
-      this.setState({members: members, availableServers: availableServers});
     } );
   }
 
@@ -203,7 +199,7 @@ export default class NsGroupRow extends React.Component {
                     { this.state.members === null ? <></> : this.state.members.map( (member, index) => (
                       <NsGroupMemberRow
                         key={index}
-                        servers={this.state.members}
+                        members={this.state.members}
                         data={member}
                         readOnly={this.props.readOnly}
                         onRemove={this.removeMember}

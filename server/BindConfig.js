@@ -39,12 +39,11 @@ module.exports = class BindConfig {
   }
 
   generateForwardZone(zone) {
-    const forwarders_array = zone.forwarders.split(',');
-    const forwarders_string = forwarders_array.join("; ");
+    const forwarderGroupName = zone.forwarders_name || `fwd_${zone.forwarder_group}`;
     return `
       zone "${zone.fqdn}" {
         type forward;
-        forwarders { ${forwarders_string}; };
+        include "${this.config_path}/zones/forward/${forwarderGroupName}.conf";
         forward only;
       };`;
   }
@@ -52,13 +51,14 @@ module.exports = class BindConfig {
   generateMasterZone(zone) {
     const slaves = this.getSlaves(zone).join('; ');
     const updaters = zone.dynamicUpdaters.join('; ');
+    const zoneTypeDir = zone.type;
     return `
       zone "${zone.fqdn}" {
         type master;
         allow-transfer { ${slaves}; };
         also-notify { ${slaves}; };${ updaters.length ? `
         allow-update { ${updaters}; };` : '' }
-        file "${this.config_path}/zones/${zone.fqdn}.${zone.view.name}.db";
+        file "${this.config_path}/zones/${zoneTypeDir}/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }
@@ -66,24 +66,26 @@ module.exports = class BindConfig {
   generateSlaveZone(zone) {
     const masters = this.getMasters(zone);
     const slaves = this.getAlternativeSlaves(zone);
+    const zoneTypeDir = zone.type;
     return `
       zone "${zone.fqdn}" {
         type slave;
         masters { ${masters[0]}; }; ${ slaves.length ? `
         allow-transfer { ${slaves.join('; ')}; };
         also-notify { ${slaves.join('; ')}; };` : '' }
-        file "zones/${zone.fqdn}.${zone.view.name}.db";
+        file "zones/${zoneTypeDir}/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }
 
   generateStubZone(zone) {
     const masters = this.getMasters(zone);
+    const zoneTypeDir = zone.type;
     return `
       zone "${zone.fqdn}" {
         type stub;
         masters { ${masters} };
-        file "zones/${zone.fqdn}.${zone.view.name}.db";
+        file "zones/${zoneTypeDir}/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }
