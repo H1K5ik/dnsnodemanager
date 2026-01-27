@@ -19,7 +19,7 @@ export default function DnsZonePreviewDialog(props) {
   }
 
   return (
-    <Dialog fullWidth open={props.open} onClose={props.onClose} onEntering={getZoneFilePreview}>
+    <Dialog fullWidth open={props.open} onClose={props.onClose} TransitionProps={{ onEntering: getZoneFilePreview }}>
       <DialogTitle>{props.zone.fqdn}</DialogTitle>
       <DialogContent>
         { data === null ? <CircularProgress /> : <TextField fullWidth multiline rows={20} defaultValue={data} InputProps={{readOnly: true, style: {fontFamily: 'monospace'}}} /> }

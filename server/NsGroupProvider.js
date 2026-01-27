@@ -4,17 +4,44 @@ module.exports = class NsGroupProvider {
     this.db = db;
   }
 
-  list = () => {
-    return this.db.table('ns_group')
+  list = async (request) => {
+    const query = this.db.table('ns_group')
       .leftJoin('ns_group_member', 'ns_group_member.group_id', 'ns_group.ID')
       .select('ns_group.*')
       .count('ns_group_member.server_id as members')
       .groupBy('ns_group.ID');
+    
+    if (request && request.user && request.user.role === 'dnsop' && request.user.ID) {
+      const accessibleGroups = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .select('group_id');
+      const groupIds = accessibleGroups.map(g => g.group_id);
+      if (groupIds.length > 0) {
+        query.whereIn('ns_group.ID', groupIds);
+      } else {
+        query.where('ns_group.ID', -1);
+      }
+    }
+    
+    return query;
   }
 
-  tree = async () => {
-    const groups = await db.table('ns_group');
-    const members = await db.table('ns_group_member')
+  tree = async (request) => {
+    let groups = await this.db.table('ns_group');
+    
+    if (request && request.user && request.user.role === 'dnsop') {
+      const accessibleGroups = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .select('group_id');
+      const groupIds = accessibleGroups.map(g => g.group_id);
+      if (groupIds.length > 0) {
+        groups = groups.filter(g => groupIds.includes(g.ID));
+      } else {
+        groups = [];
+      }
+    }
+    
+    const members = await this.db.table('ns_group_member')
       .leftJoin('server', 'ns_group_member.server_id', 'server.ID')
       .select('ns_group_member.*', 'server.name', 'server.managed', 'server.dns_ip');
     return groups.map(group => {
@@ -34,7 +61,17 @@ module.exports = class NsGroupProvider {
     return this.db('ns_group').where('ID', id);
   }
 
-  getMembers = id => {
+  getMembers = async (id, request) => {
+    if (request && request.user && request.user.role === 'dnsop') {
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', parseInt(id))
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this nameserver group");
+      }
+    }
+    
     return this.db('ns_group_member')
       .join('server', 'ns_group_member.server_id', 'server.ID')
       .leftJoin('server as source', 'ns_group_member.source_id', 'source.ID')
@@ -86,8 +123,11 @@ module.exports = class NsGroupProvider {
     // already member?
     rs = await this.db('ns_group_member').where('server_id', data.server_id).andWhere('group_id', data.group_id);
     if( rs.length ) throw Error("server is already member of group");
-    // insert member
-    await this.db('ns_group_member').insert({ server_id: data.server_id, group_id: data.group_id });
+    // Check if there's already a primary server in this group
+    rs = await this.db('ns_group_member').where('group_id', data.group_id).where('primary', true);
+    const isFirstMember = rs.length === 0;
+    // insert member (set as primary if it's the first member)
+    await this.db('ns_group_member').insert({ server_id: data.server_id, group_id: data.group_id, primary: isFirstMember ? 1 : 0 });
     await this.queueConfigSync(data.group_id);
     await this.touchZones(data.group_id);
     return "Server added to group";
@@ -146,6 +186,48 @@ module.exports = class NsGroupProvider {
 
   touchZones = groupID => {
     return this.db('zone').increment('soa_serial').where('ns_group', groupID);
+  }
+
+  getUserAccess = async (userId) => {
+    const userIdInt = parseInt(userId);
+    return this.db('user_ns_group_access')
+      .join('ns_group', 'ns_group.ID', 'user_ns_group_access.group_id')
+      .where('user_ns_group_access.user_id', userIdInt)
+      .select('ns_group.ID', 'ns_group.name');
+  }
+
+  setUserAccess = async (data) => {
+    if (!data.hasOwnProperty('userId') || !data.hasOwnProperty('groupIds')) {
+      throw Error("missing key in input data object");
+    }
+    const userId = parseInt(data.userId);
+    const groupIds = Array.isArray(data.groupIds) ? data.groupIds.map(id => parseInt(id)) : [];
+    
+    // Проверяем, что пользователь существует и имеет роль dnsop
+    const user = await this.db('user').where('ID', userId).first();
+    if (!user) throw Error("User not found");
+    if (user.role !== 'dnsop') throw Error("Access management is only available for DNS Operator role");
+    
+    // Удаляем все существующие разрешения
+    await this.db('user_ns_group_access').where('user_id', userId).del();
+    // Добавляем новые разрешения
+    if (groupIds.length > 0) {
+      // Проверяем, что все группы существуют
+      const existingGroups = await this.db('ns_group').whereIn('ID', groupIds).select('ID');
+      if (existingGroups.length !== groupIds.length) {
+        throw Error("Some group IDs are invalid");
+      }
+      const accessRecords = groupIds.map(groupId => ({
+        user_id: userId,
+        group_id: groupId
+      }));
+      await this.db('user_ns_group_access').insert(accessRecords);
+    }
+    return "User access updated";
+  }
+
+  getAllGroupsForAccess = () => {
+    return this.db('ns_group').select('ID', 'name').orderBy('name', 'asc');
   }
 
 }

@@ -7,6 +7,7 @@ import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import ListItemText from '@material-ui/core/ListItemText';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
+import Typography from '@material-ui/core/Typography';
 import DnsIcon from '@material-ui/icons/Dns';
 import GroupWorkIcon from '@material-ui/icons/GroupWork';
 import AccountCircle from '@material-ui/icons/AccountCircle';
@@ -55,10 +56,7 @@ export default function AppNavMenu(props) {
   return (
     <Drawer variant="permanent" anchor="left" className={classes.drawer} classes={{paper: classes.drawerPaper}}>
       <div className={classes.toolbar}>
-        <NotificationContext.Consumer>
-          { ({appInfo}) => (<div>DnsNM {appInfo.appVersion}</div>) }
-        </NotificationContext.Consumer>
-        <a href="https://dnsnodemanager.com/documentation" target="_blank" rel="noopener noreferrer">Online Documentation</a>
+        <Typography variant="h6" noWrap className={classes.appTitle}>DNS manager gr COD</Typography>
       </div>
       <Divider />
       <List>

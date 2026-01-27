@@ -35,6 +35,11 @@ module.exports = {
     // 0.4.1
     //  fixes bug in 0.4.0
     await this.knex('zone').whereNot('type', 'forward').update('forwarder_group', null);
+    
+    const hasTable = await this.knex.schema.hasTable('user_ns_group_access');
+    if (!hasTable) {
+      await this.knex.raw("CREATE TABLE user_ns_group_access (user_id INTEGER REFERENCES user (ID), group_id INTEGER REFERENCES ns_group (ID), PRIMARY KEY (user_id, group_id))");
+    }
   }
 
 }

@@ -100,7 +100,7 @@ export default function ServerManager(props) {
 
   return (
     <>
-      <ContentHeader title="Manage Nameservers asdasdasdasd">
+      <ContentHeader title="Manage Nameservers">
         <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<InfoIcon />} onClick={() => { setGuideOpen(true); }}>Managed Config Guide</Button>
         <Dialog open={guideOpen} onClose={() => { setGuideOpen(false); }}>
           <DialogTitle>Managed Config Guide</DialogTitle>
@@ -112,7 +112,7 @@ export default function ServerManager(props) {
           </DialogActions>
         </Dialog>
         <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<VpnKey />} style={{marginLeft: 10}} onClick={() => { setSshInfoOpen(true); }}>SSH Key Info</Button>
-        <Dialog open={sshInfoOpen} onEntering={getSshPubKey} maxWidth="xs">
+        <Dialog open={sshInfoOpen} TransitionProps={{ onEntering: getSshPubKey }} maxWidth="xs">
           <DialogTitle>SSH Key Info</DialogTitle>
           <DialogContent>
             <p>

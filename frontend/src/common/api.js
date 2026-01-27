@@ -31,10 +31,10 @@ export default function useAPI() {
       notifier.setNotification("error", "Error in API communication");
       return false;
     }
-    // Reload page after unsuccessful query
+    // Show error notification instead of reloading page
     if( response.data.hasOwnProperty('success') && ! response.data.success ) {
-      window.location.reload();
-      return [];
+      notifier.setNotification("error", response.data.message || "Error in API communication");
+      return false;
     }
     return response.data.data;
   }
@@ -147,6 +147,16 @@ export default function useAPI() {
     },
     deleteNsGroupMember: data => {
       return deleteApiData("NSGROUP/MEMBER", data);
+    },
+    // User NS Group Access
+    getUserNsGroupAccess: userId => {
+      return fetchApiData("USER/" + String(userId) + "/NSGROUPACCESS");
+    },
+    getAllNsGroups: () => {
+      return fetchApiData("NSGROUPS/ALL");
+    },
+    setUserNsGroupAccess: data => {
+      return postApiData("USER/NSGROUPACCESS", data);
     },
     // Views
     getDnsViews: () => {

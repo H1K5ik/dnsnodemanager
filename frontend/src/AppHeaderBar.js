@@ -59,7 +59,7 @@ function StatusIcon(props) {
   ) : (
     <Tooltip title="Config isn't sync on all servers">
       <IconButton aria-haspopup="true" color="inherit" onClick={props.onClick}>
-        <Badge className={classes.configIcon} badgeContent="!" color="secondary">
+        <Badge className={classes.configIcon} badgeContent="!" color="secondary" overlap="rectangular">
           <SettingsIcon />
         </Badge>
       </IconButton>
@@ -105,7 +105,7 @@ export default function AppHeaderBar(props) {
       <Toolbar>
         <StatusIcon sync={notifier.configSync} onClick={() => { setSyncDialogOpen(true); }} />
         <SyncDialog open={syncDialogOpen} busy={working} readOnly={readOnly} onClose={() => { setSyncDialogOpen(false); }} onSubmit={syncNow} />
-        <Typography variant="h6" noWrap className={classes.appTitle}>DnsNodeManager</Typography>
+        <Typography variant="h6" noWrap className={classes.appTitle}>DNS manager gr COD</Typography>
         <Button color="inherit" onClick={logout}>Logout</Button>
       </Toolbar>
     </AppBar>

@@ -74,7 +74,7 @@ export default function DnsZoneDialog(props) {
   }
 
   return (
-    <Dialog open={props.open} onClose={props.onClose} onKeyPress={pressKey} onEntering={init}>
+    <Dialog open={props.open} onClose={props.onClose} onKeyPress={pressKey} TransitionProps={{ onEntering: init }}>
       <DialogTitle>{ props.new ? 'Add New Zone' : 'Edit Zone Properties' }</DialogTitle>
       <DialogContent>
         { props.new && (

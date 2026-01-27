@@ -10,8 +10,8 @@ module.exports = class ZoneProvider {
     this.db = db;
   }
 
-  list = async () => {
-    const zones = await this.db('zone')
+  list = async (request) => {
+    const query = this.db('zone')
       .leftJoin('ns_group', 'zone.ns_group', 'ns_group.ID')
       .leftJoin('ns_group_member', function() {
         this.on('ns_group_member.group_id', 'ns_group.ID')
@@ -21,17 +21,47 @@ module.exports = class ZoneProvider {
       .leftJoin('forwarder', 'zone.forwarder_group', 'forwarder.ID')
       .select('zone.*', 'ns_group.name as ns_group_name', 'server.name as master', 'forwarder.name AS forwarder_group_name')
       .orderBy('zone.fqdn', 'asc');
+    
+    // Если пользователь - DNS Operator, фильтруем только зоны из доступных ему групп
+    if (request && request.user && request.user.role === 'dnsop') {
+      const accessibleGroups = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .select('group_id');
+      const groupIds = accessibleGroups.map(g => g.group_id);
+      if (groupIds.length > 0) {
+        query.whereIn('zone.ns_group', groupIds);
+      } else {
+        // Если нет разрешений, возвращаем пустой результат
+        query.where('zone.ns_group', -1);
+      }
+    }
+    
+    const zones = await query;
     return zones.map( zone => ({ ...zone, network: zone.fqdn.includes('.in-addr.arpa') ? APP.util.convertFqdnToIP4net(zone.fqdn) : null }) );
   }
 
-  get = async zoneID => {
+  get = async (zoneID, request) => {
     const zone = await this.db('zone')
                   .where('zone.ID', parseInt(zoneID))
                   .leftJoin('forwarder', 'forwarder.ID', 'zone.forwarder_group')
                   .select('zone.*', 'forwarder.members AS forwarders', 'forwarder.name AS forwarders_name')
                   .first();
+    if( ! zone ) throw Error("Zone not found");
+    
+    // Если пользователь - DNS Operator, проверяем доступ к зоне
+    if (request && request.user && request.user.role === 'dnsop') {
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', zone.ns_group)
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this zone");
+      }
+    }
+    
     const server = await this.db.raw('SELECT managed FROM server WHERE ID = (SELECT server_id FROM ns_group_member WHERE `group_id` = ? AND `primary` = 1)', [zone.ns_group]);
     const acls = await this.db('acl_usage').where({user_id: zone.ID, type: 'dynamic_update'});
+    if( ! server || ! server[0] ) throw Error("No primary server found for this zone's nameserver group");
     zone.managed = server[0].managed;
     zone.dynamicUpdates = Boolean(acls.length);
     zone.dynamicUpdatesAcls = acls.map(acl => acl.acl_id);
@@ -42,20 +72,33 @@ module.exports = class ZoneProvider {
     return this.db('acl_usage').where({type: 'dynamic_update', user_id: zoneID})
   }
 
-  preview = async zoneID => {
+  preview = async (zoneID, request = null) => {
     // ToDo :: silly hack/workaround. reorganize stuff.
     const zone = await this.db('zone').where('ID', parseInt(zoneID)).first();
+    if (!zone) throw Error("Zone not found");
+    
+    // Если пользователь - DNS Operator, проверяем доступ к зоне
+    if (request && request.user && request.user.role === 'dnsop') {
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', zone.ns_group)
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this zone");
+      }
+    }
+    
     const serverData = await this.db('server').join('ns_group_member', 'ns_group_member.server_id', 'server.ID').where({'ns_group_member.primary':1, 'ns_group_member.group_id': zone.ns_group}).first();
     const server = new ManagedServer(this.db);
     server.setFromObject(serverData);
     await server.loadDnsDetails();
     const zones = await server.getServerZones(zone.ID);
-    const records = await this.listRecords(zone.ID, false);
+    const records = await this.listRecords(zone.ID, request, false);
     const zoneFile = new BindZoneFile(zones[0], records);
     return {zoneFile: zoneFile.buildZoneFile()};
   }
 
-  add = async data => {
+  add = async (data, request) => {
     console.log(data);
     if( ! APP.util.validateKeys(['fqdn', 'ns_group', 'view', 'comment'], data) ) throw Error("missing key in input data object");
     // convert network to fqdn
@@ -69,6 +112,18 @@ module.exports = class ZoneProvider {
     // validate nsgroup
     const myNsGroup = await this.db('ns_group').where('ID', data.ns_group);
     if( ! myNsGroup.length ) throw Error("invalid ns group identifier");
+    
+    // Если пользователь - DNS Operator, проверяем доступ к группе
+    if (request && request.user && request.user.role === 'dnsop') {
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', data.ns_group)
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this nameserver group");
+      }
+    }
+    
     // validate fwdgroup
     if( data.type === 'forward' ) {
       const myFwdGroup = await this.db('forwarder').where('ID', data.fwd_group);
@@ -157,12 +212,36 @@ module.exports = class ZoneProvider {
     return true;
   }
 
-  update = async data => {
+  update = async (data, request) => {
     const updateKeys = ['ns_group', 'forwarder_group', 'comment', 'ttl', 'soa_rname', 'soa_retry', 'soa_expire', 'soa_refresh', 'soa_ttl', 'soa_serial', 'config'];
     if( ! APP.util.validateKeys(['ID', 'dynamicUpdatesAcls', ...updateKeys], data) ) throw Error("missing key in input data object");
     // check zone existence and get current data
     const zoneInfo = await this.db('zone').where('ID', data.ID).first();
     if( ! zoneInfo )  throw Error("Invalid zone identifier");
+    
+    // Если пользователь - DNS Operator, проверяем доступ к текущей зоне и новой группе (если меняется)
+    if (request && request.user && request.user.role === 'dnsop') {
+      // Проверяем доступ к текущей зоне
+      const hasCurrentAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', zoneInfo.ns_group)
+        .first();
+      if (!hasCurrentAccess) {
+        throw Error("You don't have access to this zone");
+      }
+      
+      // Если меняется группа, проверяем доступ к новой группе
+      if (data.ns_group && data.ns_group !== zoneInfo.ns_group) {
+        const hasNewAccess = await this.db('user_ns_group_access')
+          .where('user_id', request.user.ID)
+          .where('group_id', data.ns_group)
+          .first();
+        if (!hasNewAccess) {
+          throw Error("You don't have access to this nameserver group");
+        }
+      }
+    }
+    
     // check comment sanity
     if( ! APP.util.validateZoneComment(data.comment) ) throw Error("comment must have < 250 characters");
     // validate nsgroup
@@ -247,8 +326,23 @@ module.exports = class ZoneProvider {
     return "Zone was re-imported";
   }
 
-  delete = async data => {
+  delete = async (data, request) => {
     const zones = await this.db('zone').whereIn('ID', data);
+    
+    // Если пользователь - DNS Operator, проверяем доступ ко всем зонам
+    if (request && request.user && request.user.role === 'dnsop') {
+      const accessibleGroups = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .select('group_id');
+      const groupIds = accessibleGroups.map(g => g.group_id);
+      
+      for (const zone of zones) {
+        if (!groupIds.includes(zone.ns_group)) {
+          throw Error(`You don't have access to zone ${zone.fqdn}`);
+        }
+      }
+    }
+    
     const nsGroups = [...new Set(zones.map(zone => zone.ns_group))];
     for( let id of nsGroups ) await APP.api.nsGroupProvider.queueConfigSync(id);
     await this.db('zone').whereIn('ID', data).del();
@@ -279,7 +373,21 @@ module.exports = class ZoneProvider {
     return false;
   }
 
-  listRecords = async (zoneID, addNS = true) => {
+  listRecords = async (zoneID, request = null, addNS = true) => {
+    // Если пользователь - DNS Operator, проверяем доступ к зоне
+    if (request && request.user && request.user.role === 'dnsop') {
+      const zone = await this.db('zone').where('ID', parseInt(zoneID)).first();
+      if (!zone) throw Error("Zone not found");
+      
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', zone.ns_group)
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this zone");
+      }
+    }
+    
     const records = await this.db('record').where('zone_id', zoneID).orderBy('name', 'asc');
     if( addNS ) {
       const ns = await this.db('zone').where('zone.ID', zoneID)
@@ -293,7 +401,7 @@ module.exports = class ZoneProvider {
     return records;
   }
 
-  addRecord = async data => {
+  addRecord = async (data, request) => {
     if( ! APP.util.validateKeys(['name', 'zone_id', 'type', 'data', 'ttl'], data) ) throw Error("missing key in input data object");
     // validate record name and type
     if( data.type !== 'custom' && ! APP.util.validateDnsName(data.name) ) throw Error("invalid record name");
@@ -301,6 +409,18 @@ module.exports = class ZoneProvider {
     // zone exists?
     const rs = await this.db('zone').where('ID', parseInt(data.zone_id)).first();
     if( ! rs ) throw Error("invalid zone identifier");
+    
+    // Если пользователь - DNS Operator, проверяем доступ к зоне
+    if (request && request.user && request.user.role === 'dnsop') {
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', rs.ns_group)
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this zone");
+      }
+    }
+    
     // dynamic zones must be frozen
     const acls = await this.getAcls(data.zone_id);
     if( ! Boolean(rs.frozen) && acls.length > 0 ) throw Error('This zone currently allows dynamic updates. Freeze the zone first in order to make changes.');
@@ -310,6 +430,18 @@ module.exports = class ZoneProvider {
     if( data.addPTR && data.type === 'a' ) {
       const reverseZone = await this.findReverseZone(data.data);
       if( reverseZone === false ) throw Error("No reverse zone exists for this IP address");
+      
+      // Проверяем доступ к обратной зоне тоже
+      if (request && request.user && request.user.role === 'dnsop') {
+        const hasReverseAccess = await this.db('user_ns_group_access')
+          .where('user_id', request.user.ID)
+          .where('group_id', reverseZone.zone.ns_group)
+          .first();
+        if (!hasReverseAccess) {
+          throw Error("You don't have access to the reverse zone");
+        }
+      }
+      
       await this.db('record').insert({type: 'ptr', name: reverseZone.ptrName, data:data.name + '.' + rs.fqdn + '.', zone_id: reverseZone.zone.ID, ttl: data.ttl});
       await this.touch(reverseZone.zone.ID);
     }
@@ -371,16 +503,40 @@ module.exports = class ZoneProvider {
     return `${imported} of ${data.records.length} records imported. ${errorCount} errors.`;
   }
 
-  updateRecord = async data => {
+  updateRecord = async (data, request) => {
     if( ! APP.util.validateTTL(data.ttl) && data.ttl !== null ) throw Error("ttl value out of range (1-86400)");
     APP.util.validateRecordSanity(data.type, data.name, data.data); // throws error itself if necessary
     // Get zone data
     const rs = await this.db('zone').where('ID', parseInt(data.zone_id)).first();
     if( ! rs ) throw Error("invalid zone identifier");
+    
+    // Если пользователь - DNS Operator, проверяем доступ к зоне
+    if (request && request.user && request.user.role === 'dnsop') {
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', rs.ns_group)
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this zone");
+      }
+    }
+    
     // Update PTR record
     if( data.addPTR && data.type === 'a' ) {
       const reverseZone = await this.findReverseZone(data.data);
       if( reverseZone === false ) throw Error("No reverse zone exists for this IP address");
+      
+      // Проверяем доступ к обратной зоне тоже
+      if (request && request.user && request.user.role === 'dnsop') {
+        const hasReverseAccess = await this.db('user_ns_group_access')
+          .where('user_id', request.user.ID)
+          .where('group_id', reverseZone.zone.ns_group)
+          .first();
+        if (!hasReverseAccess) {
+          throw Error("You don't have access to the reverse zone");
+        }
+      }
+      
       const ptrData = data.name + '.' + rs.fqdn + '.';
       // Clear old PTRs
       await this.db('record').where({type: 'ptr', data: ptrData}).delete(); // ToDo: beware: zone might not be updated (touched)
@@ -396,8 +552,26 @@ module.exports = class ZoneProvider {
     return "DNS Record updated";
   }
 
-  updateRecords = async data => {
+  updateRecords = async (data, request) => {
     if( ! APP.util.validateTTL(data.ttl) && data.ttl !== null ) throw Error("ttl value out of range (1-86400)");
+    
+    // Если пользователь - DNS Operator, проверяем доступ ко всем зонам записей
+    if (request && request.user && request.user.role === 'dnsop') {
+      const records = await this.db('record').whereIn('ID', data.id_list);
+      const zoneIDs = [...new Set(records.map(record => record.zone_id))];
+      const zones = await this.db('zone').whereIn('ID', zoneIDs).select('ID', 'ns_group');
+      const accessibleGroups = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .select('group_id');
+      const groupIds = accessibleGroups.map(g => g.group_id);
+      
+      for (const zone of zones) {
+        if (!groupIds.includes(zone.ns_group)) {
+          throw Error(`You don't have access to one of the zones`);
+        }
+      }
+    }
+    
     // update records
     await this.db('record').whereIn('ID', data.id_list).update({ttl: data.ttl});
     // update serials
@@ -407,10 +581,22 @@ module.exports = class ZoneProvider {
     return "DNS Records updated";
   }
 
-  deleteRecords = async data => {
+  deleteRecords = async (data, request) => {
     const zone = await this.db('record').where('record.ID', data[0]).join('zone', 'zone.ID', 'record.zone_id').select('zone.ns_group', 'zone.ID', 'zone.frozen').first();
     // exists?
     if( ! zone ) throw Error("Record doesnt exist or is a system record");
+    
+    // Если пользователь - DNS Operator, проверяем доступ к зоне
+    if (request && request.user && request.user.role === 'dnsop') {
+      const hasAccess = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .where('group_id', zone.ns_group)
+        .first();
+      if (!hasAccess) {
+        throw Error("You don't have access to this zone");
+      }
+    }
+    
     // frozen?
     const acls = await this.getAcls(zone.ID);
     if( ! Boolean(zone.frozen) && acls.length > 0 ) throw Error('This zone currently allows dynamic updates. Freeze the zone first in order to make changes.');

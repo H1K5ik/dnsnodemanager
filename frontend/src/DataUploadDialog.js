@@ -60,7 +60,7 @@ export default function DataUploadDialog(props) {
   }
 
   return (
-    <Dialog open={props.open} onClose={props.onClose} onEntering={getGroupsAndViews}>
+    <Dialog open={props.open} onClose={props.onClose} TransitionProps={{ onEntering: getGroupsAndViews }}>
       <DialogTitle>Import {props.type}</DialogTitle>
       <DialogContent>
         <form id="import-file-form" encType="multipart/form-data">

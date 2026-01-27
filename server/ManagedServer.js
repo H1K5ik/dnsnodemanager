@@ -1,4 +1,6 @@
 const fs = require("fs");
+const { execSync } = require('child_process');
+const path = require('path');
 const NodeSSH = require('node-ssh').NodeSSH;
 const BindConfig = require('./BindConfig');
 const BindParser = require('./BindParser');
@@ -179,12 +181,18 @@ module.exports = class ManagedServer {
   }
 
   async installZoneFile(ssh, zoneFile) {
-    const remoteFile = `${this.getConfigPath()}/${zoneFile.filename}`;
+    const zonesDir = `${this.getConfigPath()}/zones`;
+    const remoteFile = `${zonesDir}/${zoneFile.filename}`;
+    
+    await ssh.execCommand(`mkdir -p ${zonesDir}`);
+    await ssh.execCommand(`chgrp ${await this.getServiceGroup(ssh)} ${zonesDir}`);
+    await ssh.execCommand(`chmod 755 ${zonesDir}`);
+    
     await ssh.putFile(`./tmp/${zoneFile.filename}`, remoteFile);
     await ssh.execCommand(`chgrp ${await this.getServiceGroup(ssh)} ${remoteFile}`);
     await ssh.execCommand(`chmod 664 ${remoteFile}`);
 
-    console.log(`Uploaded ${this.getConfigPath()}/${zoneFile.filename}`);
+    console.log(`Uploaded ${remoteFile}`);
 
     const zoneCheck = await ssh.execCommand(`named-checkzone ${zoneFile.info.fqdn} ${remoteFile}`);
 
@@ -208,16 +216,79 @@ module.exports = class ManagedServer {
     return true;
   }
 
-  async forceConfigSync(input) {
+  async initGitRepo(repoPath) {
+    const tmpDir = './tmp';
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    
+    // Проверяем, инициализирован ли git репозиторий
+    const gitDir = path.join(tmpDir, '.git');
+    if (!fs.existsSync(gitDir)) {
+      try {
+        execSync('git init', { cwd: tmpDir, stdio: 'inherit' });
+        // Настраиваем git config если нужно
+        try {
+          execSync('git config user.name "DNS Manager"', { cwd: tmpDir });
+          execSync('git config user.email "dnsmanager@localhost"', { cwd: tmpDir });
+        } catch(e) {
+          console.log('Warning: Could not set git config:', e.message);
+        }
+      } catch(e) {
+        console.log('Warning: Could not initialize git repository:', e.message);
+      }
+    }
+  }
+
+  async commitChanges(repoPath, userName, userRole) {
+    try {
+      const tmpDir = repoPath || './tmp';
+      let status;
+      try {
+        status = execSync('git status --porcelain', { cwd: tmpDir, encoding: 'utf8' });
+      } catch(e) {
+        return;
+      }
+      
+      if (!status || status.trim().length === 0) {
+        return;
+      }
+      
+      execSync('git add -A', { cwd: tmpDir });
+      
+      const commitMessage = `Config sync by ${userName} (${userRole})`;
+      execSync(`git commit -m '${commitMessage}'`, { cwd: tmpDir });
+      
+      console.log(`Git commit created: ${commitMessage}`);
+    } catch(e) {
+      console.log('Warning: Could not create git commit:', e.message);
+    }
+  }
+
+  async forceConfigSync(input, userInfo = null) {
     let i, file, rs, zone, zoneFile, fileContents, parser, rollout;
     const server = this.info;
     await this.loadDnsDetails();
     const ssh = await this.createConnection();
 
-    const tmpDir = './tmp';
-    if (!fs.existsSync(tmpDir)) {
-        fs.mkdirSync(tmpDir, { recursive: true });
+    await this.initGitRepo('./tmp');
+
+    const serverGroup = await this.db('ns_group')
+      .join('ns_group_member', 'ns_group_member.group_id', 'ns_group.ID')
+      .where('ns_group_member.server_id', server.ID)
+      .select('ns_group.name')
+      .first();
+    const groupName = serverGroup ? serverGroup.name : 'unknown';
+    
+    const baseDir = `./tmp/${groupName}`;
+    const zonesDir = `${baseDir}/zones`;
+    if (!fs.existsSync(baseDir)) {
+        fs.mkdirSync(baseDir, { recursive: true });
     }
+    if (!fs.existsSync(zonesDir)) {
+        fs.mkdirSync(zonesDir, { recursive: true });
+    }
+    
     // Fetch and prepare zone data
     const zones = await this.getServerZones();
     const masterZones = zones.filter(zone => Boolean(zone.primary) && zone.type === 'authoritative').map( zone => {
@@ -226,7 +297,7 @@ module.exports = class ManagedServer {
     } );
     // Build bind config file
     const config = new BindConfig(server.config_path.replace(/\/$/, ''));
-    const local_file = `./tmp/server_${server.ID}.bindconf`;
+    const local_file = `${baseDir}/server_${server.ID}.bindconf`;
     for( i = 0; i < zones.length; i++ ) {
       zones[i].ns_group_set = this.nameservers.filter(group => group.group_id === zones[i].ns_group);
       zones[i].dynamicUpdaters = this.acls.filter(acl => zones[i].primary && acl.user_id === zones[i].ID).map(acl => acl.members).join(',').split(',');
@@ -264,18 +335,28 @@ module.exports = class ManagedServer {
         };
         // Make new zonefile
         if( rollout ) {
-          zoneFile.writeTo(`./tmp/${zoneFile.filename}`);
+          zoneFile.writeTo(`${zonesDir}/${zoneFile.filename}`);
           zoneFiles.push(zoneFile);
         }
       }
     }
+    
+    // Создаем git коммит с локальными изменениями перед загрузкой на сервер
+    if (userInfo) {
+      await this.commitChanges('./tmp', userInfo.name || 'unknown', userInfo.role || 'unknown');
+    } else {
+      await this.commitChanges('./tmp', 'system', 'system');
+    }
+    
     // Push configuration to remote system
     if( ssh.isConnected() ) {
       await this.installConfigFile(ssh, local_file, `${this.getConfigPath()}/${this.configFileName}`);
       for( i = 0; i < zoneFiles.length; i++ ) {
+        const tempZoneFile = `./tmp/${zoneFiles[i].filename}`;
+        fs.copyFileSync(`${zonesDir}/${zoneFiles[i].filename}`, tempZoneFile);
         await this.installZoneFile(ssh, zoneFiles[i]);
-        try { fs.unlinkSync(`./tmp/${zoneFile.filename}`); }
-        catch(e) { console.log(`Failed to delete temporary zonefile ./tmp/${zoneFile.filename}`); }
+        try { fs.unlinkSync(tempZoneFile); }
+        catch(e) { console.log(`Failed to delete temporary zonefile ${tempZoneFile}`); }
       }
     } else {
       throw Error('Couldnt establish ssh connection to ' + server.ssh_host);
@@ -284,6 +365,7 @@ module.exports = class ManagedServer {
     await this.reloadServer(ssh);
     // Update config sync flag
     await this.db('server').where('ID', server.ID).update({update_required: 0, last_status: 1});
+    
     return true;
   }
 

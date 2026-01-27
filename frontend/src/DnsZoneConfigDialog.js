@@ -109,7 +109,7 @@ export default function DnsZoneConfigDialog(props) {
   React.useEffect(getAcls, []);  // eslint-disable-line
 
   return (
-    <Dialog open={props.open} onClose={props.onClose} onEntering={getZoneInfo} onKeyPress={pressKey}>
+    <Dialog open={props.open} onClose={props.onClose} TransitionProps={{ onEntering: getZoneInfo }} onKeyPress={pressKey}>
       <DialogTitle>DNS Zone: {data === null ? '' : data.fqdn}</DialogTitle>
       <DialogContent>
         { data === null ? <CircularProgress /> : (

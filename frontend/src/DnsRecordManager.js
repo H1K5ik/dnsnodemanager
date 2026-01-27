@@ -112,11 +112,17 @@ export default function DnsRecordManager(props) {
   }
 
   function getRecords() {
-    api.getDnsRecords(id).then(setRecords);
+    api.getDnsRecords(id).then(setRecords).catch(error => {
+      console.error("Error loading records:", error);
+      notifier.setNotification("error", "Failed to load DNS records");
+    });
   }
 
   function getZoneInfo() {
-    api.getDnsZone(id).then(setZoneInfo);
+    api.getDnsZone(id).then(setZoneInfo).catch(error => {
+      console.error("Error loading zone info:", error);
+      notifier.setNotification("error", "Failed to load zone information");
+    });
   }
 
   function getZoneInfoAndRecords() {

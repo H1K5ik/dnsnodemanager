@@ -113,10 +113,10 @@ export default function DnsViewsDialog(props) {
   }
 
   return (
-    <Dialog maxWidth="md" open={props.open} onClose={props.onClose} onEntering={() => { switchView('default'); }}>
+    <Dialog maxWidth="md" open={props.open} onClose={props.onClose} TransitionProps={{ onEntering: () => { switchView('default'); } }}>
       <DialogTitle>Manage DNS Views</DialogTitle>
       <DialogContent>
-        <Grid container justify="space-between" spacing={2} wrap="nowrap">
+        <Grid container justifyContent="space-between" spacing={2} wrap="nowrap">
           <Grid item>
             <List>
               <ListSubheader>Views</ListSubheader>

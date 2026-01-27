@@ -6,8 +6,31 @@ module.exports = class ServerProvider {
     this.db = db;
   }
 
-  list = () => {
-    return this.db.table('server');
+  list = async (request) => {
+    const query = this.db.table('server');
+    
+    if (request && request.user && request.user.role === 'dnsop' && request.user.ID) {
+      const accessibleGroups = await this.db('user_ns_group_access')
+        .where('user_id', request.user.ID)
+        .select('group_id');
+      const groupIds = accessibleGroups.map(g => g.group_id);
+      if (groupIds.length > 0) {
+        const accessibleServers = await this.db('ns_group_member')
+          .whereIn('group_id', groupIds)
+          .select('server_id')
+          .distinct();
+        const serverIds = accessibleServers.map(s => s.server_id);
+        if (serverIds.length > 0) {
+          query.whereIn('server.ID', serverIds);
+        } else {
+          query.where('server.ID', -1);
+        }
+      } else {
+        query.where('server.ID', -1);
+      }
+    }
+    
+    return query;
   }
 
   testSSH = async id => {
@@ -22,20 +45,22 @@ module.exports = class ServerProvider {
     return {...checkResults, server: serverData.name};
   }
 
-  forceSync = async data => {
+  forceSync = async (data, request) => {
     const server = new ManagedServer(this.db);
     await server.setFromId(parseInt(data.ID));
-    await server.forceConfigSync();
+    const userInfo = request && request.user ? { name: request.user.name, role: request.user.role } : null;
+    await server.forceConfigSync(null, userInfo);
     return "Configuration sync successful";
   }
 
-  syncPending = async () => {
+  syncPending = async (data, request) => {
     let row, server, success = true;
     const servers = await this.db('server').where({update_required: 1, managed: 1, active: 1});
+    const userInfo = request && request.user ? { name: request.user.name, role: request.user.role } : { name: 'system', role: 'system' };
     for( row of servers ) {
       server = new ManagedServer(this.db);
       server.setFromObject(row);
-      success = success && await server.forceConfigSync();
+      success = success && await server.forceConfigSync(null, userInfo);
     }
     return success ? "Configuration Sync Successful!" : "Configuration Sync Failed. Check Logfiles.";
   }

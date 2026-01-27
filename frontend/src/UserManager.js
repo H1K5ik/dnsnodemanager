@@ -21,8 +21,8 @@ import useAPI from './common/api';
 
 const permissionMatrix = [
   { roles: ['ro', 'dnsop', 'dnsadmin', 'sysadmin'], actions: ['Web Login', 'View All Information'] },
-  { roles: ['dnsop', 'dnsadmin', 'sysadmin'], actions: ['Manage DNS Records', 'Manage DNS Zones', 'Manage Forwarder Groups', 'Manage ACLs', 'Configuration Rollout'] },
-  { roles: ['dnsadmin', 'sysadmin'], actions: ['Manage DNS Views', 'Manage Nameserver Groups', 'Manage Servers'] },
+  { roles: ['dnsop', 'dnsadmin', 'sysadmin'], actions: ['Manage DNS Records', 'Manage DNS Zones', 'Manage Forwarder Groups', 'Manage ACLs', 'Configuration Rollout', 'Manage DNS Views'] },
+  { roles: ['dnsadmin', 'sysadmin'], actions: ['Manage Nameserver Groups', 'Manage Servers'] },
   { roles: ['sysadmin'], actions: ['Manage Local Users', 'Manage System Settings', 'View Audit Log'] },
 ]
 
@@ -91,10 +91,10 @@ export default function UserManager(props) {
             </TableRow>
           </TableHead>
           <TableBody>
-            { permissionMatrix.map( chunk => (
-              <>
-                { chunk.actions.map( action => (
-                  <TableRow>
+            { permissionMatrix.map( (chunk, chunkIndex) => (
+              <React.Fragment key={chunkIndex}>
+                { chunk.actions.map( (action, actionIndex) => (
+                  <TableRow key={`${chunkIndex}-${actionIndex}`}>
                     <TableCell>{action}</TableCell>
                     <TableCell>{chunk.roles.includes('ro') ? 'YES' : 'NO'}</TableCell>
                     <TableCell>{chunk.roles.includes('dnsop') ? 'YES' : 'NO'}</TableCell>
@@ -102,7 +102,7 @@ export default function UserManager(props) {
                     <TableCell>{chunk.roles.includes('sysadmin') ? 'YES' : 'NO'}</TableCell>
                   </TableRow>
                 ) ) }
-              </>
+              </React.Fragment>
             ) ) }
           </TableBody>
         </Table>

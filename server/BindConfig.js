@@ -58,7 +58,7 @@ module.exports = class BindConfig {
         allow-transfer { ${slaves}; };
         also-notify { ${slaves}; };${ updaters.length ? `
         allow-update { ${updaters}; };` : '' }
-        file "${this.config_path}/${zone.fqdn}.${zone.view.name}.db";
+        file "${this.config_path}/zones/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }
@@ -66,24 +66,30 @@ module.exports = class BindConfig {
   generateSlaveZone(zone) {
     const masters = this.getMasters(zone);
     const slaves = this.getAlternativeSlaves(zone);
+    if( ! masters || masters.length === 0 ) {
+      throw Error(`No master servers found for slave zone ${zone.fqdn}`);
+    }
     return `
       zone "${zone.fqdn}" {
         type slave;
-        masters { ${masters[0]}; }; ${ slaves.length ? `
+        masters { ${masters.join('; ')}; }; ${ slaves.length ? `
         allow-transfer { ${slaves.join('; ')}; };
         also-notify { ${slaves.join('; ')}; };` : '' }
-        file "${zone.fqdn}.${zone.view.name}.db";
+        file "zones/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }
 
   generateStubZone(zone) {
     const masters = this.getMasters(zone);
+    if( ! masters || masters.length === 0 ) {
+      throw Error(`No master servers found for stub zone ${zone.fqdn}`);
+    }
     return `
       zone "${zone.fqdn}" {
         type stub;
-        masters { ${masters} };
-        file "${zone.fqdn}.${zone.view.name}.db";
+        masters { ${masters.join('; ')}; };
+        file "zones/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }

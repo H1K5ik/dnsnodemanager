@@ -66,7 +66,7 @@ export default function DnsRecordDialog(props) {
   }
 
   return (
-    <Dialog open={props.open} onClose={props.onClose} onEntering={() => { setData(prevData => ({...prevData, type: props.recordType})); }} onKeyPress={pressKey}>
+    <Dialog open={props.open} onClose={props.onClose} TransitionProps={{ onEntering: () => { setData(prevData => ({...prevData, type: props.recordType})); } }} onKeyPress={pressKey}>
       <DialogTitle>{ props.new ? 'New ' + notifier.appInfo.rrTypes[props.recordType] : 'Edit ' + notifier.appInfo.rrTypes[props.recordType]  }</DialogTitle>
       <DialogContent>
         { data.type !== 'custom' && <FullTextField autoFocus required name="name" label="Name" defaultValue={data.name} onChange={handleInputChange} /> }

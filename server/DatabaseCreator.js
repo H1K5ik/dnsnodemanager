@@ -4,6 +4,7 @@ async function DatabaseCreator(db) {
   await db.raw("CREATE TABLE forwarder (ID INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR (100), members TEXT)");
   await db.raw("CREATE TABLE ns_group (ID INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR (100))");
   await db.raw("CREATE TABLE ns_group_member (server_id INTEGER REFERENCES server (ID), group_id  INTEGER REFERENCES ns_group (ID), hidden BOOLEAN DEFAULT (0), [primary] BOOLEAN DEFAULT (0), source_id INT REFERENCES server (ID), PRIMARY KEY (server_id, group_id))");
+  await db.raw("CREATE TABLE user_ns_group_access (user_id INTEGER REFERENCES user (ID), group_id INTEGER REFERENCES ns_group (ID), PRIMARY KEY (user_id, group_id))");
   await db.raw("CREATE TABLE record (ID INTEGER PRIMARY KEY AUTOINCREMENT, zone_id INTEGER REFERENCES zone (ID), name VARCHAR (253), type VARCHAR (10), data VARCHAR (253), ttl INTEGER)");
   await db.raw(`CREATE TABLE server (
     ID              INTEGER       PRIMARY KEY AUTOINCREMENT,

@@ -75,7 +75,7 @@ module.exports = {
     });
 
     // Servers
-    router.get('/SERVERS', APP.auth.ensureLogin, this.processRequestAsync(this.serverProvider.list));
+    router.get('/SERVERS', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.serverProvider.list));
     router.get('/SERVER/:first/SSH_HEALTH', APP.auth.ensureLogin, this.processRequestAsync(this.serverProvider.testSSH));
     router.post('/SERVER', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.serverProvider.add));
     router.patch('/SERVER', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.serverProvider.update));
@@ -84,9 +84,9 @@ module.exports = {
     router.post('/ROLLOUT', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.serverProvider.syncPending));
 
     // Nameserver Groups
-    router.get('/NSGROUPS/LIST', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.list));
-    router.get('/NSGROUPS/TREE', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.tree));
-    router.get('/NSGROUP/:first/MEMBERS', APP.auth.ensureLogin, this.processRequestAsync(this.nsGroupProvider.getMembers));
+    router.get('/NSGROUPS/LIST', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.nsGroupProvider.list));
+    router.get('/NSGROUPS/TREE', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.nsGroupProvider.tree));
+    router.get('/NSGROUP/:first/MEMBERS', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.nsGroupProvider.getMembers));
     router.post('/NSGROUP/MEMBER', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.addMember));
     router.post('/NSGROUP', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.add));
     router.patch('/NSGROUP/PRIMARY', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.setPrimary));
@@ -94,6 +94,11 @@ module.exports = {
     router.patch('/NSGROUP', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.update));
     router.delete('/NSGROUP/MEMBER', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.deleteMember));
     router.delete('/NSGROUP', APP.auth.ensureRole('dnsadmin'), this.processActionAsync(this.nsGroupProvider.delete));
+    
+    // User NS Group Access Management (for System Admin)
+    router.get('/USER/:first/NSGROUPACCESS', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.nsGroupProvider.getUserAccess));
+    router.get('/NSGROUPS/ALL', APP.auth.ensureRole('sysadmin'), this.processRequestAsync(this.nsGroupProvider.getAllGroupsForAccess));
+    router.post('/USER/NSGROUPACCESS', APP.auth.ensureRole('sysadmin'), this.processActionAsync(this.nsGroupProvider.setUserAccess));
 
     // Views
     router.get('/VIEWS', APP.auth.ensureLogin, this.processRequestAsync(this.viewProvider.list));
@@ -114,20 +119,20 @@ module.exports = {
     router.delete('/FWDGROUP', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.fwdGroupProvider.delete));
 
     // Zones n Records
-    router.get('/ZONES', APP.auth.ensureLogin, this.processRequestAsync(this.zoneProvider.list));
-    router.get('/ZONE/:first/RECORDS', APP.auth.ensureLogin, this.processRequestAsync(this.zoneProvider.listRecords));
-    router.get('/ZONE/:first/PREVIEW', APP.auth.ensureLogin, this.processRequestAsync(this.zoneProvider.preview));
-    router.get('/ZONE/:first', APP.auth.ensureLogin, this.processRequestAsync(this.zoneProvider.get));
-    router.post('/ZONE', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.add));
+    router.get('/ZONES', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.zoneProvider.list));
+    router.get('/ZONE/:first/RECORDS', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.zoneProvider.listRecords));
+    router.get('/ZONE/:first/PREVIEW', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.zoneProvider.preview));
+    router.get('/ZONE/:first', APP.auth.ensureLogin, this.processRequestAsyncWithUser(this.zoneProvider.get));
+    router.post('/ZONE', APP.auth.ensureRole('dnsop'), this.processActionAsyncWithUser(this.zoneProvider.add));
     router.patch('/ZONE/SYNC', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.sync));
     router.patch('/ZONE/FREEZE', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.freeze));
     router.patch('/ZONE/THAW', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.thaw));
-    router.patch('/ZONE', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.update));
-    router.delete('/ZONES', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.delete));
-    router.post('/RECORD', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.addRecord));
-    router.patch('/RECORDS', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.updateRecords));
-    router.patch('/RECORD', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.updateRecord));
-    router.delete('/RECORDS', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.zoneProvider.deleteRecords));
+    router.patch('/ZONE', APP.auth.ensureRole('dnsop'), this.processActionAsyncWithUser(this.zoneProvider.update));
+    router.delete('/ZONES', APP.auth.ensureRole('dnsop'), this.processActionAsyncWithUser(this.zoneProvider.delete));
+    router.post('/RECORD', APP.auth.ensureRole('dnsop'), this.processActionAsyncWithUser(this.zoneProvider.addRecord));
+    router.patch('/RECORDS', APP.auth.ensureRole('dnsop'), this.processActionAsyncWithUser(this.zoneProvider.updateRecords));
+    router.patch('/RECORD', APP.auth.ensureRole('dnsop'), this.processActionAsyncWithUser(this.zoneProvider.updateRecord));
+    router.delete('/RECORDS', APP.auth.ensureRole('dnsop'), this.processActionAsyncWithUser(this.zoneProvider.deleteRecords));
 
     // Imports
     router.post('/ZONES/CONVERTCSV', APP.auth.ensureRole('dnsop'), this.processActionAsync(this.analyzeImportZonesCSV));
@@ -165,6 +170,26 @@ module.exports = {
     } );
   },
 
+  processActionAsyncWithUser: handlerFunction => (req, res, next) => {
+    handlerFunction(req.body, req).then( result => {
+      const logUser = req.user ? req.user.name : 'anonymous';
+      const logRole = req.user ? req.user.role : 'sysadmin';
+      APP.logger.addAuditLog(req.method, req.url, JSON.stringify(req.body), logUser, logRole).then( () => {
+        switch(typeof result) {
+          case "object":
+          case "array":
+            APP.api.dataResponse(res, result, "success");
+            break;
+          default:
+            APP.api.successResponse(res, result);
+            break;
+        }
+      } );
+    } ).catch( error => {
+      APP.api.handleApiError(res, error);
+    } );
+  },
+
   processRequestAsync: handlerFunction => (req, res, next) => {
     const first = req.params.first;
     const second = req.params.second;
@@ -173,6 +198,30 @@ module.exports = {
     } ).catch( error => {
       APP.api.handleApiError(res, error);
     } );
+  },
+
+  processRequestAsyncWithUser: handlerFunction => (req, res, next) => {
+    const first = req.params.first;
+    const second = req.params.second;
+    if (first === undefined) {
+      handlerFunction(req).then( result => {
+        APP.api.dataResponse(res, result);
+      } ).catch( error => {
+        APP.api.handleApiError(res, error);
+      } );
+    } else if (second === undefined) {
+      handlerFunction(first, req).then( result => {
+        APP.api.dataResponse(res, result);
+      } ).catch( error => {
+        APP.api.handleApiError(res, error);
+      } );
+    } else {
+      handlerFunction(first, second, req).then( result => {
+        APP.api.dataResponse(res, result);
+      } ).catch( error => {
+        APP.api.handleApiError(res, error);
+      } );
+    }
   },
 
   dataResponse(response, data, message = null) {
