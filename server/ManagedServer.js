@@ -263,7 +263,17 @@ module.exports = class ManagedServer {
       try {
         const lastCommit = execSync('git log -1 --format=%cI', { cwd: tmpDir, encoding: 'utf8' }).trim();
         if (lastCommit) {
-          lastCommitTime = lastCommit;
+          // Переводим время последнего коммита в формат SQLite DATETIME: 'YYYY-MM-DD HH:MM:SS' (UTC),
+          // чтобы корректно сравнивать с полем audit.timestamp (CURRENT_TIMESTAMP в SQLite).
+          const dt = new Date(lastCommit);
+          const pad = (n) => String(n).padStart(2, '0');
+          const year = dt.getUTCFullYear();
+          const month = pad(dt.getUTCMonth() + 1);
+          const day = pad(dt.getUTCDate());
+          const hours = pad(dt.getUTCHours());
+          const minutes = pad(dt.getUTCMinutes());
+          const seconds = pad(dt.getUTCSeconds());
+          lastCommitTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         }
       } catch (e) {
         // Репозиторий может быть без коммитов — тогда берём просто последние действия
