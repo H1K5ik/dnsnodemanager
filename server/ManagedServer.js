@@ -297,7 +297,7 @@ module.exports = class ManagedServer {
         if (recentActions && recentActions.length > 0) {
           const pad = (n) => String(n).padStart(2, '0');
 
-          const lines = recentActions.map(a => {.
+          const lines = recentActions.map(a => {
             let localTimestamp = a.timestamp;
             try {
               const dt = new Date(a.timestamp.replace(' ', 'T') + 'Z');
