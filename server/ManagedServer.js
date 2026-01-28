@@ -257,21 +257,39 @@ module.exports = class ManagedServer {
       // Добавляем все изменения в индекс
       execSync('git add -A', { cwd: tmpDir });
 
-      // Собираем краткое описание последних действий пользователей,
-      // чтобы включить их прямо в сообщение коммита.
+      // Определяем время предыдущего git-коммита,
+      // чтобы собрать только действия после него.
+      let lastCommitTime = null;
+      try {
+        const lastCommit = execSync('git log -1 --format=%cI', { cwd: tmpDir, encoding: 'utf8' }).trim();
+        if (lastCommit) {
+          lastCommitTime = lastCommit;
+        }
+      } catch (e) {
+        // Репозиторий может быть без коммитов — тогда берём просто последние действия
+        lastCommitTime = null;
+      }
+
+      // Собираем краткое описание действий ТОЛЬКО текущего пользователя
+      // между предыдущим коммитом и текущим моментом.
       let actionsSummary = '';
       try {
-        const recentActions = await this.db('audit')
+        let query = this.db('audit')
           .whereIn('method', ['POST', 'PATCH', 'DELETE'])
-          .orderBy('timestamp', 'desc')
-          .limit(10);
+          .andWhere('user', userName);
+
+        if (lastCommitTime) {
+          query = query.andWhere('timestamp', '>', lastCommitTime);
+        }
+
+        const recentActions = await query.orderBy('timestamp', 'asc');
 
         if (recentActions && recentActions.length > 0) {
           const lines = recentActions.map(a => {
             let dataStr = a.data;
             return `- [${a.timestamp}] ${a.user} (${a.role}) ${a.method} ${a.action} ${dataStr || ''}`.trim();
           });
-          actionsSummary = '\n\nRecent user actions:\n' + lines.join('\n');
+          actionsSummary = '\n\nUser actions since last sync:\n' + lines.join('\n');
         }
       } catch (e) {
         console.log('Warning: Could not load audit log for git commit message:', e.message);
@@ -279,10 +297,9 @@ module.exports = class ManagedServer {
 
       const commitMessage = `Config sync by ${userName} (${userRole})${actionsSummary}`;
 
-      const commitMsgFile = path.join(tmpDir, 'commit_message.txt');
-      fs.writeFileSync(commitMsgFile, commitMessage, { encoding: 'utf8' });
-
-      execSync(`git commit -F "${commitMsgFile}"`, { cwd: tmpDir });
+      // Передаём сообщение коммита напрямую в stdin git commit,
+      // без использования временного файла.
+      execSync('git commit -F -', { cwd: tmpDir, input: commitMessage });
       
       console.log(`Git commit created: ${commitMessage}`);
     } catch(e) {
