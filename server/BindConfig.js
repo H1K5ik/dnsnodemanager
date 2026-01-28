@@ -52,13 +52,26 @@ module.exports = class BindConfig {
   generateMasterZone(zone) {
     const slaves = this.getSlaves(zone).join('; ');
     const updaters = zone.dynamicUpdaters.join('; ');
+
+    const allowTransferBlock = slaves.length
+      ? `        allow-transfer { ${slaves}; };
+`
+      : '';
+
+    const alsoNotifyBlock = slaves.length
+      ? `        also-notify { ${slaves}; };
+`
+      : '';
+
+    const allowUpdateBlock = updaters.length
+      ? `        allow-update { ${updaters}; };
+`
+      : '';
+
     return `
       zone "${zone.fqdn}" {
         type master;
-        allow-transfer { ${slaves}; };
-        also-notify { ${slaves}; };${ updaters.length ? `
-        allow-update { ${updaters}; };` : '' }
-        file "${this.config_path}/zones/${zone.fqdn}.${zone.view.name}.db";
+${allowTransferBlock}${alsoNotifyBlock}${allowUpdateBlock}        file "${this.config_path}/zones/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }

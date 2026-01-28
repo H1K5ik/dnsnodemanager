@@ -136,8 +136,8 @@ export default function ServerManager(props) {
               <TableCell>Server Name</TableCell>
               <TableCell>NS FQDN</TableCell>
               <TableCell>IP Address</TableCell>
-              <TableCell>Type sadasdasd</TableCell>
-              <TableCell>Status sadasdasd</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell>SSH Health</TableCell>
               <TableCell>Config Sync</TableCell>
             </TableRow>
