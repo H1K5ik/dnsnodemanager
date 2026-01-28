@@ -253,11 +253,36 @@ module.exports = class ManagedServer {
       if (!status || status.trim().length === 0) {
         return;
       }
-      
+
+      // Добавляем все изменения в индекс
       execSync('git add -A', { cwd: tmpDir });
-      
-      const commitMessage = `Config sync by ${userName} (${userRole})`;
-      execSync(`git commit -m '${commitMessage}'`, { cwd: tmpDir });
+
+      // Собираем краткое описание последних действий пользователей,
+      // чтобы включить их прямо в сообщение коммита.
+      let actionsSummary = '';
+      try {
+        const recentActions = await this.db('audit')
+          .whereIn('method', ['POST', 'PATCH', 'DELETE'])
+          .orderBy('timestamp', 'desc')
+          .limit(10);
+
+        if (recentActions && recentActions.length > 0) {
+          const lines = recentActions.map(a => {
+            let dataStr = a.data;
+            return `- [${a.timestamp}] ${a.user} (${a.role}) ${a.method} ${a.action} ${dataStr || ''}`.trim();
+          });
+          actionsSummary = '\n\nRecent user actions:\n' + lines.join('\n');
+        }
+      } catch (e) {
+        console.log('Warning: Could not load audit log for git commit message:', e.message);
+      }
+
+      const commitMessage = `Config sync by ${userName} (${userRole})${actionsSummary}`;
+
+      const commitMsgFile = path.join(tmpDir, 'commit_message.txt');
+      fs.writeFileSync(commitMsgFile, commitMessage, { encoding: 'utf8' });
+
+      execSync(`git commit -F "${commitMsgFile}"`, { cwd: tmpDir });
       
       console.log(`Git commit created: ${commitMessage}`);
     } catch(e) {
