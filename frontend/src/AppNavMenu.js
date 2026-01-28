@@ -45,7 +45,6 @@ const navGroups = [
     { key: 'importer', label: 'Data Import', icon: <GetAppIcon />, adminOnly: false },
   ], [
     { key: 'users', label: 'User Management', icon: <AccountCircle />, adminOnly: true },
-    { key: 'audit', label: 'Audit Log', icon: <PlaylistPlayIcon />, adminOnly: true },
   ]
 ];
 

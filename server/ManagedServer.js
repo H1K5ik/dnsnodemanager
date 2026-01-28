@@ -295,9 +295,26 @@ module.exports = class ManagedServer {
         const recentActions = await query.orderBy('timestamp', 'asc');
 
         if (recentActions && recentActions.length > 0) {
-          const lines = recentActions.map(a => {
+          const pad = (n) => String(n).padStart(2, '0');
+
+          const lines = recentActions.map(a => {.
+            let localTimestamp = a.timestamp;
+            try {
+              const dt = new Date(a.timestamp.replace(' ', 'T') + 'Z');
+              if (!isNaN(dt.getTime())) {
+                const year = dt.getFullYear();
+                const month = pad(dt.getMonth() + 1);
+                const day = pad(dt.getDate());
+                const hours = pad(dt.getHours());
+                const minutes = pad(dt.getMinutes());
+                const seconds = pad(dt.getSeconds());
+                localTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+              }
+            } catch (e) {
+            }
+
             let dataStr = a.data;
-            return `- [${a.timestamp}] ${a.user} (${a.role}) ${a.method} ${a.action} ${dataStr || ''}`.trim();
+            return `- [${localTimestamp}] ${a.user} (${a.role}) ${a.method} ${a.action} ${dataStr || ''}`.trim();
           });
           actionsSummary = '\n\nUser actions since last sync:\n' + lines.join('\n');
         }

@@ -23,7 +23,7 @@ const permissionMatrix = [
   { roles: ['ro', 'dnsop', 'dnsadmin', 'sysadmin'], actions: ['Web Login', 'View All Information'] },
   { roles: ['dnsop', 'dnsadmin', 'sysadmin'], actions: ['Manage DNS Records', 'Manage DNS Zones', 'Manage Forwarder Groups', 'Manage ACLs', 'Configuration Rollout', 'Manage DNS Views'] },
   { roles: ['dnsadmin', 'sysadmin'], actions: ['Manage Nameserver Groups', 'Manage Servers'] },
-  { roles: ['sysadmin'], actions: ['Manage Local Users', 'Manage System Settings', 'View Audit Log'] },
+  { roles: ['sysadmin'], actions: ['Manage Local Users', 'Manage System Settings'] },
 ]
 
 export default function UserManager(props) {

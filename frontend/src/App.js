@@ -23,7 +23,6 @@ import DnsManager from "./DnsManager";
 import DnsRecordManager from "./DnsRecordManager";
 import DataImporter from "./DataImporter";
 import UserManager from "./UserManager";
-import Audit from "./Audit";
 
 const useStyles = makeStyles( theme => ({
   backdrop: {
@@ -59,7 +58,6 @@ export default function App(props) {
                   <Box>
                     <Switch>
                       { user.role === 'sysadmin' && <Route path="/users" component={UserManager} /> }
-                      { user.role === 'sysadmin' && <Route path="/audit" component={Audit} /> }
                       <Route path="/servers" component={ServerManager} />
                       <Route path="/fwdgroups" component={FwdGroupManager} />
                       <Route path="/acls" component={AccessListManager} />
