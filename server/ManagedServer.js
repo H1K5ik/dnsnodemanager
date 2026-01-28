@@ -286,7 +286,6 @@ module.exports = class ManagedServer {
       try {
         let query = this.db('audit')
           .whereIn('method', ['POST', 'PATCH', 'DELETE'])
-          .andWhere('user', userName);
 
         if (lastCommitTime) {
           query = query.andWhere('timestamp', '>', lastCommitTime);
