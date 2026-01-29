@@ -40,6 +40,14 @@ module.exports = {
     if (!hasTable) {
       await this.knex.raw("CREATE TABLE user_ns_group_access (user_id INTEGER REFERENCES user (ID), group_id INTEGER REFERENCES ns_group (ID), PRIMARY KEY (user_id, group_id))");
     }
+
+    const hasZoneDeleteQueue = await this.knex.schema.hasTable('zone_delete_queue');
+    if (!hasZoneDeleteQueue) {
+      await this.knex.raw(`CREATE TABLE zone_delete_queue (
+        ns_group   INTEGER REFERENCES ns_group (ID),
+        filename   VARCHAR (255)
+      )`);
+    }
   }
 
 }
