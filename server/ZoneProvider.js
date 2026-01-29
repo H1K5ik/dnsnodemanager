@@ -342,9 +342,7 @@ module.exports = class ZoneProvider {
         }
       }
     }
-    
-    // Добавляем удалённые зоны в очередь на удаление zone-файлов на серверах
-    // Файл зоны формируется как "<fqdn>.<view>.db"
+  
     const deleteQueue = zones.map(zone => ({
       ns_group: zone.ns_group,
       filename: `${zone.fqdn}.${zone.view}.db`

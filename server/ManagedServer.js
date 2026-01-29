@@ -359,7 +359,7 @@ module.exports = class ManagedServer {
     
     // Fetch and prepare zone data
     const zones = await this.getServerZones();
-    const masterZones = zones.filter(zone => Boolean(zone.primary) && zone.type === 'authoritative').map( zone => {
+    const authoritativeZones = zones.filter(zone => zone.type === 'authoritative').map( zone => {
       zone.dynamic = Boolean(this.acls.filter(acl => zone.primary && acl.user_id === zone.ID).length);
       return zone;
     } );
@@ -372,36 +372,34 @@ module.exports = class ManagedServer {
       config.addZone(zones[i]);
     }
     fs.writeFileSync(local_file, config.buildConfigFile());
-    // Build zone files
+    // Собираем и заливаем файлы зон на все серверы (не только на мастера); AXFR не используем
     const zoneFiles = [];
-    if( masterZones.length > 0 ) {
-      // Get all records from all master zones
-      const records = await this.db('record').whereIn('zone_id', masterZones.map(z => z.ID)).orderBy('name', 'asc');
-      for( zone of masterZones ) {
+    if( authoritativeZones.length > 0 ) {
+      const records = await this.db('record').whereIn('zone_id', authoritativeZones.map(z => z.ID)).orderBy('name', 'asc');
+      for( zone of authoritativeZones ) {
         zoneFile = new BindZoneFile(zone, records.filter(r => r.zone_id === zone.ID));
         rollout = true;
-        // Sync dynamic zones before zone-rollout
-        if( zone.dynamic ) {
+        if( zone.primary && zone.dynamic ) {
           rs = await this.syncZone(zone.fqdn, zone.view);
           if( ! rs ) console.log('Dynamic zone sync failed: ' + zone.fqdn);
         }
-        // Download remote zone file
-        try {
-          console.log(`Downloading ${this.getConfigPath()}/zones/${zoneFile.filename} from ${this.info.name}`);
-          fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/zones/${zoneFile.filename}`);
-          parser = new BindParser();
-          parser.setContent(fileContents);
-          // Check serial
-          if( zone.dynamic && parser.getSerial() > zone.soa_serial ) {
-            rollout = false;
-            throw Error(zone.fqdn + ": Dynamic zone serial is higher than expected. Freeze and sync this zone before making changes!");
+        // На мастере с уже существующим файлом — проверяем serial (динамические зоны)
+        if( zone.primary ) {
+          try {
+            console.log(`Downloading ${this.getConfigPath()}/zones/${zoneFile.filename} from ${this.info.name}`);
+            fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/zones/${zoneFile.filename}`);
+            parser = new BindParser();
+            parser.setContent(fileContents);
+            if( zone.dynamic && parser.getSerial() > zone.soa_serial ) {
+              rollout = false;
+              throw Error(zone.fqdn + ": Dynamic zone serial is higher than expected. Freeze and sync this zone before making changes!");
+            }
+            rollout = parser.getSerial() < zone.soa_serial;
+            console.log(`Remote serial ${parser.getSerial()}, local serial ${zone.soa_serial}, rollout=${rollout}`);
+          } catch(e) {
+            console.log("File download failed: " + e.toString());
           }
-          rollout = parser.getSerial() < zone.soa_serial;
-          console.log(`Remote serial ${parser.getSerial()}, local serial ${zone.soa_serial}, rollout=${rollout}`);
-        } catch(e) {
-          console.log("File download failed: " + e.toString());
-        };
-        // Make new zonefile
+        }
         if( rollout ) {
           zoneFile.writeTo(`${zonesDir}/${zoneFile.filename}`);
           zoneFiles.push(zoneFile);

@@ -29,9 +29,9 @@ module.exports = class BindConfig {
   generateZone(zone) {
     try {
       if( zone.type === 'forward' ) return this.generateForwardZone(zone);
-      if( zone.primary ) return this.generateMasterZone(zone);
       if( zone.type === 'stub' ) return this.generateStubZone(zone);
-      return this.generateSlaveZone(zone);
+      if( zone.type === 'authoritative' ) return this.generateMasterZone(zone);
+      throw Error('Unknown zone type: ' + zone.fqdn);
     } catch(e) {
       console.log(e);
       throw Error('Fatal: Failed to create config for ' + zone.fqdn);
