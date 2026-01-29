@@ -310,7 +310,7 @@ module.exports = class ZoneProvider {
     await server.setFromId(serverID);
     const success = await server.syncZone(data.fqdn, data.view);
     if( success ) {
-      const remoteFile  = `${server.getConfigPath()}/${data.fqdn}.${data.view}.db`;
+      const remoteFile  = `${server.getConfigPath()}/zones/${data.fqdn}.${data.view}.db`;
       const sshCon = await server.createConnection();
       const fileContent = await server.getRemoteFileContents(sshCon, remoteFile);
       const parser = new BindParser();
@@ -343,6 +343,16 @@ module.exports = class ZoneProvider {
       }
     }
     
+    // Добавляем удалённые зоны в очередь на удаление zone-файлов на серверах
+    // Файл зоны формируется как "<fqdn>.<view>.db"
+    const deleteQueue = zones.map(zone => ({
+      ns_group: zone.ns_group,
+      filename: `${zone.fqdn}.${zone.view}.db`
+    }));
+    if (deleteQueue.length > 0) {
+      await this.db('zone_delete_queue').insert(deleteQueue);
+    }
+
     const nsGroups = [...new Set(zones.map(zone => zone.ns_group))];
     for( let id of nsGroups ) await APP.api.nsGroupProvider.queueConfigSync(id);
     await this.db('zone').whereIn('ID', data).del();

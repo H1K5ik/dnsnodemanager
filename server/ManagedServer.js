@@ -315,7 +315,7 @@ module.exports = class ManagedServer {
             let dataStr = a.data;
             return `- [${localTimestamp}] ${a.user} (${a.role}) ${a.method} ${a.action} ${dataStr || ''}`.trim();
           });
-          actionsSummary = '\n\nUser actions since last sync:\n' + lines.join('\n');
+          actionsSummary = '\n\nUsers actions since last sync:\n' + lines.join('\n');
         }
       } catch (e) {
         console.log('Warning: Could not load audit log for git commit message:', e.message);
@@ -387,8 +387,8 @@ module.exports = class ManagedServer {
         }
         // Download remote zone file
         try {
-          console.log(`Downloading ${this.getConfigPath()}/${zoneFile.filename} from ${this.info.name}`);
-          fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/${zoneFile.filename}`);
+          console.log(`Downloading ${this.getConfigPath()}/zones/${zoneFile.filename} from ${this.info.name}`);
+          fileContents = await this.getRemoteFileContents(ssh, `${this.getConfigPath()}/zones/${zoneFile.filename}`);
           parser = new BindParser();
           parser.setContent(fileContents);
           // Check serial
@@ -407,6 +407,24 @@ module.exports = class ManagedServer {
           zoneFiles.push(zoneFile);
         }
       }
+    }
+    
+    try {
+      const groupIds = [...new Set(zones.map(z => z.ns_group))];
+      if (groupIds.length > 0) {
+        const queuedDeletes = await this.db('zone_delete_queue').whereIn('ns_group', groupIds);
+        if (queuedDeletes.length > 0) {
+          const remoteZonesDir = `${this.getConfigPath()}/zones`;
+          const filenames = [...new Set(queuedDeletes.map(d => d.filename))];
+          for (const filename of filenames) {
+            console.log(`Removing deleted zone file on server: ${remoteZonesDir}/${filename}`);
+            await ssh.execCommand(`rm -f ${remoteZonesDir}/${filename}`);
+          }
+          await this.db('zone_delete_queue').whereIn('ns_group', groupIds).del();
+        }
+      }
+    } catch (e) {
+      console.log('Warning: failed to delete queued zone files:', e.toString());
     }
     
     // Создаем git коммит с локальными изменениями перед загрузкой на сервер

@@ -58,6 +58,10 @@ async function DatabaseCreator(db) {
     frozen          BOOLEAN       DEFAULT (0),
     last_mod        TEXT
   )`);
+  await db.raw(`CREATE TABLE zone_delete_queue (
+    ns_group   INTEGER REFERENCES ns_group (ID),
+    filename   VARCHAR (255)
+  )`);
   await db.raw(`CREATE TABLE audit (
     timestamp DATETIME      DEFAULT (CURRENT_TIMESTAMP),
     user      VARCHAR (100),
