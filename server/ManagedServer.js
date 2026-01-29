@@ -410,7 +410,9 @@ module.exports = class ManagedServer {
     try {
       const groupIds = [...new Set(zones.map(z => z.ns_group))];
       if (groupIds.length > 0) {
-        const queuedDeletes = await this.db('zone_delete_queue').whereIn('ns_group', groupIds);
+        const queuedDeletes = await this.db('zone_delete_queue')
+          .whereIn('ns_group', groupIds)
+          .where(b => b.where('server_id', server.ID).orWhereNull('server_id'));  
         if (queuedDeletes.length > 0) {
           const remoteZonesDir = `${this.getConfigPath()}/zones`;
           const filenames = [...new Set(queuedDeletes.map(d => d.filename))];
@@ -418,7 +420,11 @@ module.exports = class ManagedServer {
             console.log(`Removing deleted zone file on server: ${remoteZonesDir}/${filename}`);
             await ssh.execCommand(`rm -f ${remoteZonesDir}/${filename}`);
           }
-          await this.db('zone_delete_queue').whereIn('ns_group', groupIds).del();
+          await this.db('zone_delete_queue')
+            .whereIn('ns_group', groupIds)
+            .whereIn('filename', filenames)
+            .where(b => b.where('server_id', server.ID).orWhereNull('server_id'))
+            .del();
         }
       }
     } catch (e) {

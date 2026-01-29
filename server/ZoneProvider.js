@@ -343,10 +343,14 @@ module.exports = class ZoneProvider {
       }
     }
   
-    const deleteQueue = zones.map(zone => ({
-      ns_group: zone.ns_group,
-      filename: `${zone.fqdn}.${zone.view}.db`
-    }));
+    const deleteQueue = [];
+    for (const zone of zones) {
+      const serverIds = await this.db('ns_group_member').where('group_id', zone.ns_group).select('server_id');
+      const filename = `${zone.fqdn}.${zone.view}.db`;
+      for (const { server_id } of serverIds) {
+        deleteQueue.push({ ns_group: zone.ns_group, filename, server_id });
+      }
+    }
     if (deleteQueue.length > 0) {
       await this.db('zone_delete_queue').insert(deleteQueue);
     }

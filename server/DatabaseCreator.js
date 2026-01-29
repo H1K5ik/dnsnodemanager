@@ -60,7 +60,8 @@ async function DatabaseCreator(db) {
   )`);
   await db.raw(`CREATE TABLE zone_delete_queue (
     ns_group   INTEGER REFERENCES ns_group (ID),
-    filename   VARCHAR (255)
+    filename   VARCHAR (255),
+    server_id  INTEGER REFERENCES server (ID)
   )`);
   await db.raw(`CREATE TABLE audit (
     timestamp DATETIME      DEFAULT (CURRENT_TIMESTAMP),

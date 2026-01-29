@@ -45,8 +45,16 @@ module.exports = {
     if (!hasZoneDeleteQueue) {
       await this.knex.raw(`CREATE TABLE zone_delete_queue (
         ns_group   INTEGER REFERENCES ns_group (ID),
-        filename   VARCHAR (255)
+        filename   VARCHAR (255),
+        server_id  INTEGER REFERENCES server (ID)
       )`);
+    }
+    if (hasZoneDeleteQueue) {
+      try {
+        await this.knex.raw('ALTER TABLE zone_delete_queue ADD COLUMN server_id INTEGER REFERENCES server(ID)');
+      } catch (e) {
+        if (!e.message || !e.message.includes('duplicate column')) throw e;
+      }
     }
   }
 
