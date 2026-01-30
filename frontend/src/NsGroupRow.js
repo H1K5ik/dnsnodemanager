@@ -23,20 +23,6 @@ import NsGroupDialog from './NsGroupDialog';
 
 function NsGroupMemberRow(props) {
   const [menuAnchor, setMenuAnchor] = React.useState(null);
-  const [sourceMenuAnchor, setSourceMenuAnchor] = React.useState(null);
-
-  function setSource(id) {
-    let newData = Object.assign({}, props.data);
-    newData.source_id = id;
-    props.onSetSource(newData);
-    setSourceMenuAnchor(null);
-  }
-
-  function getAvailableSources() {
-    return props.servers.filter( member => {
-      return ! ( Boolean(member.primary) || props.data.server_id === member.server_id || props.data.source_id === member.server_id );
-    } );
-  }
 
   return (
     <TableRow>
@@ -45,11 +31,6 @@ function NsGroupMemberRow(props) {
           <MenuIcon />
         </IconButton>
         <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => { setMenuAnchor(null); }}>
-          { ! Boolean(props.data.primary) &&
-            <MenuItem onClick={() => { props.onSetPrimary(props.data); setMenuAnchor(null); }}>
-              Set Primary
-            </MenuItem>
-          }
           <MenuItem onClick={() => { props.onToggleHidden(props.data); setMenuAnchor(null); }}>
             {props.data.hidden ? "Unset Hidden" : "Set Hidden"}
           </MenuItem>
@@ -60,20 +41,6 @@ function NsGroupMemberRow(props) {
       </TableCell>
       <TableCell>{props.data.name}</TableCell>
       <TableCell>{props.data.dns_ip}</TableCell>
-      <TableCell>
-        { props.data.primary || props.servers.length < 3 ? <>Primary (default)</> : (
-          <>
-            { props.data.source_id === null ? 'Primary (default)' : props.data.source_name }
-            <IconButton aria-haspopup="true" color="secondary" disabled={props.readOnly} children={<EditIcon />} onClick={e => { setSourceMenuAnchor(e.currentTarget); }} />
-            <Menu anchorEl={sourceMenuAnchor} open={Boolean(sourceMenuAnchor)} onClose={() => { setSourceMenuAnchor(null); }}>
-              { getAvailableSources().map( (server, index) => <MenuItem key={index} onClick={() => { setSource(server.server_id); }}>{server.name}</MenuItem> ) }
-              { props.data.source_id !== null &&
-                <MenuItem onClick={() => { setSource(null); }}>Primary (default)</MenuItem>
-              }
-            </Menu>
-          </>
-        ) }
-      </TableCell>
     </TableRow>
   );
 
@@ -136,12 +103,6 @@ export default class NsGroupRow extends React.Component {
     let dataObject = {group_id: this.props.data.ID, server_id: server_id};
     this.props.api.addNsGroupMember(dataObject).then(this.updateMembers);
   }
-  setPrimary = member => {
-    this.props.api.setNsGroupPrimary(member).then(this.updateMembers);
-  }
-  setSource = member => {
-    this.props.api.updateNsGroupMember(member).then(this.updateMembers);
-  }
   toggleHiddenMember = member => {
     member.hidden = !Boolean(member.hidden);
     this.props.api.updateNsGroupMember(member).then(this.updateMembers);
@@ -187,25 +148,21 @@ export default class NsGroupRow extends React.Component {
                       <TableCell />
                       <TableCell>Server</TableCell>
                       <TableCell>IP Address</TableCell>
-                      <TableCell>Transfer Source</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     { this.state.members === null ? <></> : this.state.members.map( (member, index) => (
                       <NsGroupMemberRow
                         key={index}
-                        servers={this.state.members}
                         data={member}
                         readOnly={this.props.readOnly}
                         onRemove={this.removeMember}
                         onToggleHidden={this.toggleHiddenMember}
-                        onSetPrimary={this.setPrimary}
-                        onSetSource={this.setSource}
                       />
                     ) )}
                     { this.state.availableServers.length > 0 && (
                       <TableRow>
-                        <TableCell colSpan="4">
+                        <TableCell colSpan="3">
                             <Button variant="contained" color="secondary" disabled={!Boolean(this.state.availableServers) || this.props.readOnly} startIcon={<AddCircle />} onClick={e => { this.setAddMenuAnchor(e.currentTarget); }}>Add Server</Button>
                             <Menu anchorEl={this.state.addMenuAnchor} open={Boolean(this.state.addMenuAnchor)} onClose={() => { this.setAddMenuAnchor(null); }}>
                               { this.state.availableServers.map( (server, index) => <MenuItem key={index} onClick={() => { this.addMember(server.ID); this.setAddMenuAnchor(null); }}>{server.name}</MenuItem> ) }
