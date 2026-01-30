@@ -16,16 +16,6 @@ module.exports = class BindConfig {
     return masters.map(server => (server.dns_ip));
   }
 
-  getSlaves(zone) {
-    const slaves = zone.ns_group_set.filter(server => { return !Boolean(server.primary); });
-    return slaves.map(server => (server.dns_ip));
-  }
-
-  getAlternativeSlaves(zone) {
-    const slaves = zone.ns_group_set.filter(server => server.source_id === zone.serverID);
-    return slaves.map(server => (server.dns_ip));
-  }
-
   generateZone(zone) {
     try {
       if( zone.type === 'forward' ) return this.generateForwardZone(zone);
@@ -50,18 +40,7 @@ module.exports = class BindConfig {
   }
 
   generateMasterZone(zone) {
-    const slaves = this.getSlaves(zone).join('; ');
     const updaters = zone.dynamicUpdaters.join('; ');
-
-    const allowTransferBlock = slaves.length
-      ? `        allow-transfer { ${slaves}; };
-`
-      : '';
-
-    const alsoNotifyBlock = slaves.length
-      ? `        also-notify { ${slaves}; };
-`
-      : '';
 
     const allowUpdateBlock = updaters.length
       ? `        allow-update { ${updaters}; };
@@ -71,27 +50,24 @@ module.exports = class BindConfig {
     return `
       zone "${zone.fqdn}" {
         type master;
-${allowTransferBlock}${alsoNotifyBlock}${allowUpdateBlock}        file "${this.config_path}/zones/${zone.fqdn}.${zone.view.name}.db";
+${allowUpdateBlock}        file "${this.config_path}/zones/${zone.fqdn}.${zone.view.name}.db";
         ${zone.config || ''}
       };`;
   }
 
-  generateSlaveZone(zone) {
-    const masters = this.getMasters(zone);
-    const slaves = this.getAlternativeSlaves(zone);
-    if( ! masters || masters.length === 0 ) {
-      throw Error(`No master servers found for slave zone ${zone.fqdn}`);
-    }
-    return `
-      zone "${zone.fqdn}" {
-        type slave;
-        masters { ${masters.join('; ')}; }; ${ slaves.length ? `
-        allow-transfer { ${slaves.join('; ')}; };
-        also-notify { ${slaves.join('; ')}; };` : '' }
-        file "zones/${zone.fqdn}.${zone.view.name}.db";
-        ${zone.config || ''}
-      };`;
-  }
+  // generateSlaveZone(zone) {
+  //   const masters = this.getMasters(zone);
+  //   if( ! masters || masters.length === 0 ) {
+  //     throw Error(`No master servers found for slave zone ${zone.fqdn}`);
+  //   }
+  //   return `
+  //     zone "${zone.fqdn}" {
+  //       type slave;
+  //       masters { ${masters.join('; ')}; };
+  //       file "zones/${zone.fqdn}.${zone.view.name}.db";
+  //       ${zone.config || ''}
+  //     };`;
+  // }
 
   generateStubZone(zone) {
     const masters = this.getMasters(zone);

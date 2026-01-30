@@ -38,13 +38,6 @@ function NsGroupMemberRow(props) {
     } );
   }
 
-  function getType() {
-    let text = props.data.hidden ? 'Hidden ' : '';
-    text += props.data.primary ? 'Primary' : 'Secondary'
-    text += props.data.managed ? '' : ' (unmanaged)';
-    return text;
-  }
-
   return (
     <TableRow>
       <TableCell component="th" scope="row">
@@ -67,7 +60,6 @@ function NsGroupMemberRow(props) {
       </TableCell>
       <TableCell>{props.data.name}</TableCell>
       <TableCell>{props.data.dns_ip}</TableCell>
-      <TableCell>{getType()}</TableCell>
       <TableCell>
         { props.data.primary || props.servers.length < 3 ? <>Primary (default)</> : (
           <>
@@ -183,7 +175,7 @@ export default class NsGroupRow extends React.Component {
           </TableCell>
         </TableRow>
         <TableRow>
-          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={5}>
+          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={4}>
             <Collapse in={this.state.expanded} timeout="auto" unmountOnExit>
               <Box margin={1}>
                 <Typography variant="h6" gutterBottom component="div">
@@ -195,7 +187,6 @@ export default class NsGroupRow extends React.Component {
                       <TableCell />
                       <TableCell>Server</TableCell>
                       <TableCell>IP Address</TableCell>
-                      <TableCell>Type</TableCell>
                       <TableCell>Transfer Source</TableCell>
                     </TableRow>
                   </TableHead>
@@ -214,7 +205,7 @@ export default class NsGroupRow extends React.Component {
                     ) )}
                     { this.state.availableServers.length > 0 && (
                       <TableRow>
-                        <TableCell colSpan="5">
+                        <TableCell colSpan="4">
                             <Button variant="contained" color="secondary" disabled={!Boolean(this.state.availableServers) || this.props.readOnly} startIcon={<AddCircle />} onClick={e => { this.setAddMenuAnchor(e.currentTarget); }}>Add Server</Button>
                             <Menu anchorEl={this.state.addMenuAnchor} open={Boolean(this.state.addMenuAnchor)} onClose={() => { this.setAddMenuAnchor(null); }}>
                               { this.state.availableServers.map( (server, index) => <MenuItem key={index} onClick={() => { this.addMember(server.ID); this.setAddMenuAnchor(null); }}>{server.name}</MenuItem> ) }
