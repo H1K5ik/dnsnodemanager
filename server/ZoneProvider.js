@@ -360,7 +360,8 @@ module.exports = class ZoneProvider {
     await this.db('zone').whereIn('ID', data).del();
     await this.db('record').whereIn('zone_id', data).del();
     await this.db('acl_usage').whereIn('user_id', data).del();
-    return "DNS zones deleted";
+    const zoneNames = zones.map(z => z.fqdn).join(', ');
+    return { message: "DNS zones deleted", auditData: zoneNames };
   }
 
   findReverseZone = async ipaddr => {

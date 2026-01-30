@@ -174,7 +174,10 @@ module.exports = {
     handlerFunction(req.body, req).then( result => {
       const logUser = req.user ? req.user.name : 'anonymous';
       const logRole = req.user ? req.user.role : 'sysadmin';
-      APP.logger.addAuditLog(req.method, req.url, JSON.stringify(req.body), logUser, logRole).then( () => {
+      const auditData = (result && typeof result === 'object' && result.auditData !== undefined)
+        ? result.auditData
+        : JSON.stringify(req.body);
+      APP.logger.addAuditLog(req.method, req.url, auditData, logUser, logRole).then( () => {
         switch(typeof result) {
           case "object":
           case "array":
