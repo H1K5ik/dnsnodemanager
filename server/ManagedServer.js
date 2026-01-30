@@ -333,7 +333,7 @@ module.exports = class ManagedServer {
     }
   }
 
-  async forceConfigSync(input, userInfo = null) {
+  async forceConfigSync(input, userInfo = null, options = null) {
     let i, file, rs, zone, zoneFile, fileContents, parser, rollout;
     const server = this.info;
     await this.loadDnsDetails();
@@ -419,6 +419,15 @@ module.exports = class ManagedServer {
           for (const filename of filenames) {
             console.log(`Removing deleted zone file on server: ${remoteZonesDir}/${filename}`);
             await ssh.execCommand(`rm -f ${remoteZonesDir}/${filename}`);
+            const localPath = `${zonesDir}/${filename}`;
+            try {
+              if (fs.existsSync(localPath)) {
+                fs.unlinkSync(localPath);
+                console.log(`Removed from tmp: ${localPath}`);
+              }
+            } catch (e) {
+              if (e.code !== 'ENOENT') console.log('Warning: failed to remove from tmp:', e.message);
+            }
           }
           await this.db('zone_delete_queue')
             .whereIn('ns_group', groupIds)
@@ -431,11 +440,13 @@ module.exports = class ManagedServer {
       console.log('Warning: failed to delete queued zone files:', e.toString());
     }
     
-    // Создаем git коммит с локальными изменениями перед загрузкой на сервер
-    if (userInfo) {
-      await this.commitChanges('./tmp', userInfo.name || 'unknown', userInfo.role || 'unknown');
-    } else {
-      await this.commitChanges('./tmp', 'system', 'system');
+    const doCommit = options == null || options.commitGit !== false;
+    if (doCommit) {
+      if (userInfo) {
+        await this.commitChanges('./tmp', userInfo.name || 'unknown', userInfo.role || 'unknown');
+      } else {
+        await this.commitChanges('./tmp', 'system', 'system');
+      }
     }
     
     // Push configuration to remote system

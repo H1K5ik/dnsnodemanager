@@ -57,10 +57,12 @@ module.exports = class ServerProvider {
     let row, server, success = true;
     const servers = await this.db('server').where({update_required: 1, managed: 1, active: 1});
     const userInfo = request && request.user ? { name: request.user.name, role: request.user.role } : { name: 'system', role: 'system' };
-    for( row of servers ) {
+    const lastIndex = servers.length - 1;
+    for( let i = 0; i < servers.length; i++ ) {
+      row = servers[i];
       server = new ManagedServer(this.db);
       server.setFromObject(row);
-      success = success && await server.forceConfigSync(null, userInfo);
+      success = success && await server.forceConfigSync(null, userInfo, { commitGit: i === lastIndex });
     }
     return success ? "Configuration Sync Successful!" : "Configuration Sync Failed. Check Logfiles.";
   }
