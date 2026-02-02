@@ -64,7 +64,6 @@
   "servers.syncRequired": "Sync required",
   "servers.upToDate": "Up to date",
   "servers.addServerTitle": "Add Server",
-  "servers.editServer": "Edit Server",
   "servers.serverNameHelper": "Short server alias, for internal use only.",
   "servers.nsFqdnHelper": "Fully qualified domain name of the dns server. Will be used for NS records.",
   "servers.managedServer": "Managed Server",

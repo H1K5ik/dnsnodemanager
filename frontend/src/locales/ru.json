@@ -64,7 +64,6 @@
   "servers.syncRequired": "Требуется синхронизация",
   "servers.upToDate": "Актуален",
   "servers.addServerTitle": "Добавить сервер",
-  "servers.editServer": "Редактировать сервер",
   "servers.serverNameHelper": "Краткий псевдоним сервера, только для внутреннего использования.",
   "servers.nsFqdnHelper": "Полное доменное имя DNS-сервера. Будет использоваться в NS-записях.",
   "servers.managedServer": "Управляемый сервер",
