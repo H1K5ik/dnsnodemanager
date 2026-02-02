@@ -6,9 +6,12 @@ import DialogTitle from '@material-ui/core/DialogTitle';
 import TextField from '@material-ui/core/TextField';
 import Button from '@material-ui/core/Button';
 
+import { useTranslation } from './common/LanguageContext';
+
 export default function AccessListDialog(props) {
   const [data, setData] = React.useState({...props.data});
   const [busy, setBusy] = React.useState(false);
+  const { t } = useTranslation();
 
   function handleInput(event) {
     const name = event.currentTarget.name;
@@ -30,14 +33,14 @@ export default function AccessListDialog(props) {
 
   return (
     <Dialog open={props.open} onClose={props.onClose} onKeyPress={pressKey}>
-      <DialogTitle>{props.new ? 'Create Forwarder Group' : 'Update Forwarder Group'}</DialogTitle>
+      <DialogTitle>{props.new ? t('acls.dialogTitleCreate') : t('acls.dialogTitleUpdate')}</DialogTitle>
       <DialogContent>
-        <TextField autoFocus required fullWidth variant="outlined" margin="dense" name="name" label="ACL Name" defaultValue={props.data.name} onChange={handleInput} />
-        <TextField required fullWidth variant="outlined" margin="dense" name="members" label="IP Addresses" helperText="Comma seperated list of IP Addresses" defaultValue={props.data.members} onChange={handleInput} />
+        <TextField autoFocus required fullWidth variant="outlined" margin="dense" name="name" label={t('acls.aclName')} defaultValue={props.data.name} onChange={handleInput} />
+        <TextField required fullWidth variant="outlined" margin="dense" name="members" label={t('acls.ipAddresses')} helperText={t('acls.membersHelper')} defaultValue={props.data.members} onChange={handleInput} />
       </DialogContent>
       <DialogActions>
-        <Button disabled={busy} onClick={props.onClose}>Cancel</Button>
-        <Button disabled={busy} onClick={submit}>{props.new ? 'Add ACL' : 'Save Changes'}</Button>
+        <Button disabled={busy} onClick={props.onClose}>{t('app.cancel')}</Button>
+        <Button disabled={busy} onClick={submit}>{props.new ? t('acls.addAcl') : t('common.saveChanges')}</Button>
       </DialogActions>
     </Dialog>
   );

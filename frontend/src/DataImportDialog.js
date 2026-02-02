@@ -8,8 +8,11 @@ import Box from '@material-ui/core/Box';
 import Switch from '@material-ui/core/Switch';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 
+import { useTranslation } from './common/LanguageContext';
+
 export default function DataImportDialog(props) {
   const [busy, setBusy] = React.useState(false);
+  const { t } = useTranslation();
   const [options, setOptions] = React.useState({
     skipError: true,
     createZones: false,
@@ -34,26 +37,26 @@ export default function DataImportDialog(props) {
 
   return (
     <Dialog open={props.open} onClose={props.onClose}>
-      <DialogTitle>Import Options</DialogTitle>
+      <DialogTitle>{t("importer.importOptions")}</DialogTitle>
       <DialogContent>
         { props.type === 'records' && (
           <>
             <Box>
               <FormControlLabel
                 control={<Switch checked={options.createZones} name="createZones" onChange={toggleSwitch} color="primary" disabled />}
-                label="Auto-create missing zones"
+                label={t("importer.autoCreateZones")}
               />
             </Box>
             <Box>
               <FormControlLabel
                 control={<Switch checked={options.ignoreNS} name="ignoreNS" onChange={toggleSwitch} color="primary" />}
-                label="Ignore NS Records"
+                label={t("importer.ignoreNs")}
               />
             </Box>
             <Box>
               <FormControlLabel
                 control={<Switch checked={options.ignoreTTL} name="ignoreTTL" onChange={toggleSwitch} color="primary" />}
-                label="Ignore TTL"
+                label={t("importer.ignoreTtl")}
               />
             </Box>
           </>
@@ -62,20 +65,20 @@ export default function DataImportDialog(props) {
           <Box>
             <FormControlLabel
               control={<Switch checked={options.replaceZones} name="replaceZones" onChange={toggleSwitch} color="primary" />}
-              label="Replace existing zones"
+              label={t("importer.replaceZones")}
             />
           </Box>
         ) }
         <Box>
           <FormControlLabel
             control={<Switch checked={options.skipError} name="skipError" onChange={toggleSwitch} color="primary" />}
-            label="Skip Errors"
+            label={t("importer.skipErrors")}
           />
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button disabled={busy} onClick={props.onClose}>Cancel</Button>
-        <Button disabled={busy} onClick={submit}>Start Import</Button>
+        <Button disabled={busy} onClick={props.onClose}>{t("app.cancel")}</Button>
+        <Button disabled={busy} onClick={submit}>{t("importer.startImport")}</Button>
       </DialogActions>
     </Dialog>
   );

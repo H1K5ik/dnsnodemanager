@@ -45,6 +45,7 @@ import DnsRecordDialog from "./DnsRecordDialog";
 import DnsRecordTtlDialog from "./DnsRecordTtlDialog";
 import { AuthenticationContext } from "./common/AuthenticationProvider";
 import { NotificationContext } from "./common/NotificationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from "./common/api";
 
 const tableIcons = {
@@ -78,6 +79,7 @@ export default function DnsRecordManager(props) {
   const [configDialogOpen, setConfigDialogOpen] = React.useState(false);
   const [ttlDialogOpen, setTtlDialogOpen] = React.useState(false);
   const [selectedRows, setSelectedRows] = React.useState([]);
+  const { t } = useTranslation();
   const [zoneInfo, setZoneInfo] = React.useState(null);
   const [records, setRecords] = React.useState([]);
 
@@ -114,14 +116,14 @@ export default function DnsRecordManager(props) {
   function getRecords() {
     api.getDnsRecords(id).then(setRecords).catch(error => {
       console.error("Error loading records:", error);
-      notifier.setNotification("error", "Failed to load DNS records");
+      notifier.setNotification("error", t("dns.failedLoadRecords"));
     });
   }
 
   function getZoneInfo() {
     api.getDnsZone(id).then(setZoneInfo).catch(error => {
       console.error("Error loading zone info:", error);
-      notifier.setNotification("error", "Failed to load zone information");
+      notifier.setNotification("error", t("dns.failedLoadZone"));
     });
   }
 
@@ -184,16 +186,16 @@ export default function DnsRecordManager(props) {
   React.useEffect(getZoneInfoAndRecords, []);  // eslint-disable-line
 
   const tableColumns = [
-    { title: "Name", field: "name" },
-    { title: "Type", field: "type", lookup: notifier.appInfo.rrTypes},
-    { title: "Data", field: "data" },
-    { title: "TTL", field: "ttl", filtering: false },
+    { title: t("dns.name"), field: "name" },
+    { title: t("dns.type"), field: "type", lookup: notifier.appInfo.rrTypes},
+    { title: t("dns.data"), field: "data" },
+    { title: t("dns.ttl"), field: "ttl", filtering: false },
   ];
 
   const tableActions = canEdit ? [
-    { icon: forwardRef((props, ref) => <AddCircle {...props} ref={ref} />), tooltip: 'Add new records', isFreeAction: true, onClick: event => { setAddMenuAnchor(event.currentTarget); } },
-    { icon: forwardRef((props, ref) => <EditIcon {...props} ref={ref} />), tooltip: 'Edit records', onClick: openEditDialog },
-    { icon: forwardRef((props, ref) => <DeleteIcon {...props} ref={ref} />), tooltip: 'Delete records', onClick: deleteRecords },
+    { icon: forwardRef((props, ref) => <AddCircle {...props} ref={ref} />), tooltip: t('dns.addRecords'), isFreeAction: true, onClick: event => { setAddMenuAnchor(event.currentTarget); } },
+    { icon: forwardRef((props, ref) => <EditIcon {...props} ref={ref} />), tooltip: t('dns.editRecords'), onClick: openEditDialog },
+    { icon: forwardRef((props, ref) => <DeleteIcon {...props} ref={ref} />), tooltip: t('dns.deleteRecords'), onClick: deleteRecords },
   ] : [];
 
   const tableOptions = {
@@ -208,21 +210,21 @@ export default function DnsRecordManager(props) {
 
   return (
     <>
-      <ContentHeader title="Manage DNS Zone">
-        <Button variant="contained" color="primary" startIcon={<ArrowBackIcon />} style={{marginRight: 10}} onClick={navigateToView}>Back</Button>
-        <Button variant="contained" color="primary" disabled={zoneInfo === null || ! zoneInfo.managed || zoneInfo.type !== 'authoritative'} startIcon={<PhotoCamera />} style={{marginRight: 10}} onClick={() => { setPreviewDialogOpen(true); }}>Zonefile Preview</Button>
+      <ContentHeader title={t("dns.manageZone")}>
+        <Button variant="contained" color="primary" startIcon={<ArrowBackIcon />} style={{marginRight: 10}} onClick={navigateToView}>{t("dns.back")}</Button>
+        <Button variant="contained" color="primary" disabled={zoneInfo === null || ! zoneInfo.managed || zoneInfo.type !== 'authoritative'} startIcon={<PhotoCamera />} style={{marginRight: 10}} onClick={() => { setPreviewDialogOpen(true); }}>{t("dns.zonefilePreview")}</Button>
         { renderPreviewDialog() }
         { renderFreezeThawButton() }
-        <Button variant="contained" color="primary" disabled={zoneInfo === null || Boolean(zoneInfo.frozen) || ! Boolean(zoneInfo.managed) || zoneInfo.type !== 'authoritative'} startIcon={<SyncIcon />} style={{marginRight: 10}} onClick={() => { setSyncDialogOpen(true); }}>Re-Import Zone</Button>
-        <SyncWarnDialog open={syncDialogOpen} onClose={() => { setSyncDialogOpen(false); }} onSubmit={syncZone} />
-        <Button variant="contained" color="primary" disabled={zoneInfo === null || ! zoneInfo.managed} startIcon={<SettingsIcon />} onClick={() => { setConfigDialogOpen(true); }}>Zone Settings</Button>
+        <Button variant="contained" color="primary" disabled={zoneInfo === null || Boolean(zoneInfo.frozen) || ! Boolean(zoneInfo.managed) || zoneInfo.type !== 'authoritative'} startIcon={<SyncIcon />} style={{marginRight: 10}} onClick={() => { setSyncDialogOpen(true); }}>{t("dns.reimportZone")}</Button>
+        <SyncWarnDialog open={syncDialogOpen} onClose={() => { setSyncDialogOpen(false); }} onSubmit={syncZone} t={t} />
+        <Button variant="contained" color="primary" disabled={zoneInfo === null || ! zoneInfo.managed} startIcon={<SettingsIcon />} onClick={() => { setConfigDialogOpen(true); }}>{t("dns.zoneSettings")}</Button>
         { renderSettingsDialog() }
       </ContentHeader>
-      { zoneInfo === null ? <LinearProgress /> : ! Boolean(zoneInfo.managed) && zoneInfo.type === 'authoritative' ? <Box>The primary server of <b>{zoneInfo.fqdn}</b> is unmanaged, hence the records aren't available in this GUI</Box> : (
+      { zoneInfo === null ? <LinearProgress /> : ! Boolean(zoneInfo.managed) && zoneInfo.type === 'authoritative' ? <Box>{t("dns.unmanagedPrimary", { fqdn: zoneInfo.fqdn })}</Box> : (
       <>
-        { zoneInfo.type === 'forward' ? <Box>Zone '{zoneInfo.fqdn}' is forwarding all requests to {zoneInfo.forwarders_name} ({zoneInfo.forwarders})</Box> : (
+        { zoneInfo.type === 'forward' ? <Box>{t("dns.forwardZoneInfo", { fqdn: zoneInfo.fqdn, name: zoneInfo.forwarders_name, forwarders: zoneInfo.forwarders })}</Box> : (
         <>
-          <MaterialTable data={records} columns={tableColumns} options={tableOptions} actions={tableActions} title={"Records in " + zoneInfo.fqdn} icons={tableIcons} />
+          <MaterialTable data={records} columns={tableColumns} options={tableOptions} actions={tableActions} title={t("dns.recordsIn", { fqdn: zoneInfo.fqdn })} icons={tableIcons} />
           <Menu anchorEl={addMenuAnchor} open={Boolean(addMenuAnchor)} onClose={() => { setAddMenuAnchor(null); }}>
             { buildRecordTypesKeyList().map( key => <MenuItem key={key} onClick={() => { openAddDialog(key); }}>{notifier.appInfo.rrTypes[key]}</MenuItem> ) }
           </Menu>
@@ -238,17 +240,19 @@ export default function DnsRecordManager(props) {
 }
 
 function SyncWarnDialog(props) {
+  const t = props.t;
+  if (!t) return null;
   return (
     <Dialog open={props.open} onClose={props.onClose}>
-      <DialogTitle>Zone Re-Import</DialogTitle>
+      <DialogTitle>{t("dns.zoneReimport")}</DialogTitle>
       <DialogContent>
-        <h4>Warning</h4>
-        <p>This will download and import the current zone state and records from the active master (primary) server of this zone. Any pending zone chanes will be discarded!</p>
-        <p>Use this only if you have implemented changes on the master servers zone file manually or if this zone allows dynamic updates</p>
+        <h4>{t("dns.warning")}</h4>
+        <p>{t("dns.zoneReimportWarning")}</p>
+        <p>{t("dns.zoneReimportHint")}</p>
       </DialogContent>
       <DialogActions>
-        <Button onClick={props.onClose}>Cancel</Button>
-        <Button onClick={props.onSubmit}>Import Now</Button>
+        <Button onClick={props.onClose}>{t("app.cancel")}</Button>
+        <Button onClick={props.onSubmit}>{t("dns.importNow")}</Button>
       </DialogActions>
     </Dialog>
   );

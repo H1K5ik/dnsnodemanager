@@ -188,9 +188,9 @@ module.exports = {
             break;
         }
       } );
-    } ).catch( error => {
-      APP.api.handleApiError(res, error);
-    } );
+      } ).catch( error => {
+        APP.api.handleApiError(res, error);
+      } );
   },
 
   processRequestAsync: handlerFunction => (req, res, next) => {

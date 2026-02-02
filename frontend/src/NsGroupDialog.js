@@ -6,7 +6,10 @@ import DialogTitle from '@material-ui/core/DialogTitle';
 import TextField from '@material-ui/core/TextField';
 import Button from '@material-ui/core/Button';
 
+import { useTranslation } from './common/LanguageContext';
+
 export default function NsGroupDialog(props) {
+  const { t } = useTranslation();
 
   function pressKey(event) {
     if(event.key === 'Enter') props.onSubmit();
@@ -14,13 +17,13 @@ export default function NsGroupDialog(props) {
 
   return (
     <Dialog open={props.open} onClose={props.onClose} onKeyPress={pressKey}>
-      <DialogTitle>{props.new ? 'Create Nameserver Group' : 'Update Group Name'}</DialogTitle>
+      <DialogTitle>{props.new ? t('nsgroups.createGroup') : t('nsgroups.updateGroupName')}</DialogTitle>
       <DialogContent>
-        <TextField autoFocus required fullWidth variant="outlined" name="name" label="NS Group Name" defaultValue={props.defaultName} onChange={props.onInput} />
+        <TextField autoFocus required fullWidth variant="outlined" name="name" label={t('nsgroups.nsGroupName')} defaultValue={props.defaultName} onChange={props.onInput} />
       </DialogContent>
       <DialogActions>
-        <Button disabled={props.blocked} onClick={props.onClose}>Cancel</Button>
-        <Button disabled={props.blocked} onClick={props.onSubmit}>{props.new ? 'Add Group' : 'Save Changes'}</Button>
+        <Button disabled={props.blocked} onClick={props.onClose}>{t('app.cancel')}</Button>
+        <Button disabled={props.blocked} onClick={props.onSubmit}>{props.new ? t('fwd.addGroupBtn') : t('common.saveChanges')}</Button>
       </DialogActions>
     </Dialog>
   );

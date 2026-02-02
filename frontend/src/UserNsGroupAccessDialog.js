@@ -13,6 +13,7 @@ import LinearProgress from '@material-ui/core/LinearProgress';
 import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 
+import { useTranslation } from './common/LanguageContext';
 import useAPI from './common/api';
 
 export default function UserNsGroupAccessDialog(props) {
@@ -20,6 +21,7 @@ export default function UserNsGroupAccessDialog(props) {
   const [loading, setLoading] = React.useState(true);
   const [allGroups, setAllGroups] = React.useState([]);
   const [selectedGroups, setSelectedGroups] = React.useState([]);
+  const { t } = useTranslation();
   const api = useAPI();
 
   React.useEffect(() => {
@@ -77,14 +79,14 @@ export default function UserNsGroupAccessDialog(props) {
 
   return (
     <Dialog maxWidth="sm" fullWidth open={props.open} onClose={props.onClose}>
-      <DialogTitle>Manage Nameserver Group Access</DialogTitle>
+      <DialogTitle>{t('users.manageNsAccessTitle')}</DialogTitle>
       <DialogContent>
         {loading ? (
           <Box m={2}><LinearProgress /></Box>
         ) : (
           <>
             <Typography variant="body2" color="textSecondary" style={{ marginBottom: 16 }}>
-              Select which Nameserver Groups this DNS Operator can access:
+              {t('users.selectNsGroups')}
             </Typography>
             <FormControlLabel
               control={
@@ -94,7 +96,7 @@ export default function UserNsGroupAccessDialog(props) {
                   onChange={handleSelectAll}
                 />
               }
-              label="Select All"
+              label={t('users.selectAll')}
             />
             <List style={{ maxHeight: 400, overflow: 'auto' }}>
               {allGroups.map(group => (
@@ -110,15 +112,15 @@ export default function UserNsGroupAccessDialog(props) {
             </List>
             {allGroups.length === 0 && (
               <Typography variant="body2" color="textSecondary" style={{ padding: 16, textAlign: 'center' }}>
-                No Nameserver Groups available
+                {t('users.noNsGroups')}
               </Typography>
             )}
           </>
         )}
       </DialogContent>
       <DialogActions>
-        <Button disabled={busy || loading} onClick={props.onClose}>Cancel</Button>
-        <Button disabled={busy || loading} onClick={submitForm} color="primary" variant="contained">Save</Button>
+        <Button disabled={busy || loading} onClick={props.onClose}>{t('app.cancel')}</Button>
+        <Button disabled={busy || loading} onClick={submitForm} color="primary" variant="contained">{t('users.apply')}</Button>
       </DialogActions>
     </Dialog>
   );

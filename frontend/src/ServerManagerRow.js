@@ -13,11 +13,13 @@ import CheckCircle from '@material-ui/icons/CheckCircle';
 import ErrorCircle from '@material-ui/icons/Error';
 
 import ServerManagerDialog from "./ServerManagerDialog";
+import { useTranslation } from './common/LanguageContext';
 import useAPI from './common/api';
 
 export default function ServerManagerRow(props) {
   const [menuAnchor, setMenuAnchor] = React.useState(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const { t } = useTranslation();
   const api = useAPI();
 
   let data = props.data;
@@ -54,23 +56,23 @@ export default function ServerManagerRow(props) {
   }
 
   function renderServerType() {
-    return data.managed ? <Chip icon={<SettingsIcon />} label="Managed" /> : <Chip label="Unmanaged / External" variant="outlined" />;
+    return data.managed ? <Chip icon={<SettingsIcon />} label={t("servers.managed")} /> : <Chip label={t("servers.unmanaged")} variant="outlined" />;
   }
 
   function renderServerStatus() {
     if( ! data.managed ) return '';
-    return data.active ? <Chip icon={<NetworkCheckIcon />} label="Active" /> : <Chip icon={<BuildIcon />} label="Maintenance" variant="outlined" />;
+    return data.active ? <Chip icon={<NetworkCheckIcon />} label={t("servers.active")} /> : <Chip icon={<BuildIcon />} label={t("servers.maintenance")} variant="outlined" />;
   }
 
   function renderServerHealth() {
     if( ! data.managed ) return "";
     if( data.last_status === null ) return "new / unknown"
-    return data.last_status ? <Chip icon={<CheckCircle />} label="Healthy" color="primary" /> : <Chip icon={<ErrorCircle />} label="Failed" color="secondary" />;
+    return data.last_status ? <Chip icon={<CheckCircle />} label={t("servers.healthy")} color="primary" /> : <Chip icon={<ErrorCircle />} label={t("servers.failed")} color="secondary" />;
   }
 
   function renderConfigSync() {
     if( ! data.managed ) return "";
-    return data.update_required ? <Chip icon={<ErrorCircle />} label="Sync required" color="secondary" /> : <Chip icon={<CheckCircle />} label="Up to date" color="primary" />;
+    return data.update_required ? <Chip icon={<ErrorCircle />} label={t("servers.syncRequired")} color="secondary" /> : <Chip icon={<CheckCircle />} label={t("servers.upToDate")} color="primary" />;
   }
 
   return (
@@ -80,11 +82,11 @@ export default function ServerManagerRow(props) {
           <MenuIcon />
         </IconButton>
         <Menu keepMounted anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={closeMenu}>
-          { Boolean(data.managed) && <MenuItem disabled={props.readOnly} onClick={checkConnection}>Check SSH Health</MenuItem> }
-          { Boolean(data.managed) && <MenuItem disabled={props.readOnly} onClick={forceConfigSync}>Force Config Sync</MenuItem> }
-          { Boolean(data.managed) && <MenuItem disabled={props.readOnly} onClick={toggleMaintenance}>Toggle Maintenance</MenuItem> }
-          <MenuItem disabled={props.readOnly} onClick={() => { toggleEditDialog(); closeMenu(); }}>Edit Server</MenuItem>
-          <MenuItem disabled={props.readOnly} onClick={() => { props.onDelete(data); closeMenu(); }}>Delete Server</MenuItem>
+          { Boolean(data.managed) && <MenuItem disabled={props.readOnly} onClick={checkConnection}>{t("servers.checkSshHealth")}</MenuItem> }
+          { Boolean(data.managed) && <MenuItem disabled={props.readOnly} onClick={forceConfigSync}>{t("servers.forceConfigSync")}</MenuItem> }
+          { Boolean(data.managed) && <MenuItem disabled={props.readOnly} onClick={toggleMaintenance}>{t("servers.toggleMaintenance")}</MenuItem> }
+          <MenuItem disabled={props.readOnly} onClick={() => { toggleEditDialog(); closeMenu(); }}>{t("servers.editServer")}</MenuItem>
+          <MenuItem disabled={props.readOnly} onClick={() => { props.onDelete(data); closeMenu(); }}>{t("servers.deleteServer")}</MenuItem>
         </Menu>
         <ServerManagerDialog open={dialogOpen} data={data} onSubmit={editServer} toggleFunc={toggleEditDialog} />
       </TableCell>

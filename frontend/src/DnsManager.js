@@ -13,6 +13,7 @@ import DnsZoneManager from "./DnsZoneManager";
 import DnsViewsDialog from "./DnsViewsDialog";
 
 import { AuthenticationContext } from "./common/AuthenticationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 export default function DnsManager(props) {
@@ -25,6 +26,7 @@ export default function DnsManager(props) {
   const api = useAPI();
 
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const canEdit = ['dnsop','dnsadmin','sysadmin'].includes(session.user.role);
 
   function switchView(e, value) {
@@ -54,8 +56,8 @@ export default function DnsManager(props) {
 
   return (
     <>
-      <ContentHeader title="DNS Managament">
-        <Button variant="contained" color="primary" startIcon={<VisibilityIcon />} onClick={() => { setViewDialogOpen(true); }}>Manage DNS Views</Button>
+      <ContentHeader title={t("dns.title")}>
+        <Button variant="contained" color="primary" startIcon={<VisibilityIcon />} onClick={() => { setViewDialogOpen(true); }}>{t("dns.manageViews")}</Button>
         <DnsViewsDialog open={viewDialogOpen} views={dnsViews} readOnly={!canEdit} onClose={() => { setViewDialogOpen(false); }} onRefresh={getDnsViews} />
       </ContentHeader>
       <Paper>

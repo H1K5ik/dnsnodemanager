@@ -39,8 +39,10 @@ export default function DnsRecordDialog(props) {
 
   function submitForm() {
     setBusy(true);
+    const payload = { name: data.name, zone_id: data.zone_id, type: data.type, data: data.data, ttl: data.ttl };
+    if( data.type === 'a' ) payload.addPTR = Boolean(data.addPTR);
     if( props.new ) {
-      api.addDnsRecord(data).then( result => {
+      api.addDnsRecord(payload).then( result => {
         setBusy(false);
         if( result ) {
           props.onClose();
@@ -51,7 +53,7 @@ export default function DnsRecordDialog(props) {
         }
       } );
     } else {
-      api.updateDnsRecord(data).then( result => {
+      api.updateDnsRecord({ ...data, addPTR: data.type === 'a' ? Boolean(data.addPTR) : undefined }).then( result => {
         setBusy(false);
         if( result ) {
           props.onClose();

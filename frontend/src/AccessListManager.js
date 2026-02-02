@@ -17,6 +17,7 @@ import AccessListRow from './AccessListRow';
 import AccessListDialog from './AccessListDialog';
 
 import { AuthenticationContext } from "./common/AuthenticationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 export default function AccessListManager(props) {
@@ -26,6 +27,7 @@ export default function AccessListManager(props) {
   const api = useAPI();
 
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const canEdit = ['dnsop','dnsadmin','sysadmin'].includes(session.user.role);
 
   function updateAcls() {
@@ -49,16 +51,16 @@ export default function AccessListManager(props) {
 
   return (
     <>
-      <ContentHeader title="Access Lists">
-        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={() => { setAclDialogOpen(true); }}>New ACL</Button>
+      <ContentHeader title={t("acls.title")}>
+        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={() => { setAclDialogOpen(true); }}>{t("acls.newAcl")}</Button>
         <AccessListDialog new open={aclDialogOpen} onClose={() => { setAclDialogOpen(false); }} onSubmit={addAcl} />
       </ContentHeader>
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>ACL Name</TableCell>
-              <TableCell>IP Addresses</TableCell>
+              <TableCell>{t("acls.aclName")}</TableCell>
+              <TableCell>{t("acls.ipAddresses")}</TableCell>
               <TableCell />
             </TableRow>
           </TableHead>

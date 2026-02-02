@@ -17,6 +17,7 @@ import ContentHeader from "./ContentHeader";
 import DataUploadDialog from "./DataUploadDialog"
 import DataImportDialog from "./DataImportDialog";
 import { AuthenticationContext } from "./common/AuthenticationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 export default function DataImporter(props) {
@@ -28,13 +29,14 @@ export default function DataImporter(props) {
   const [importDialogOpen, setImportDialogOpen] = React.useState(false);
 
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const canUse = ['dnsop','dnsadmin','sysadmin'].includes(session.user.role);
   const api = useAPI();
 
   const tableShape = {
-    records: { zone: "Zone", name: "Name", type: "Type", data: "Data", ttl: "TTL" },
-    zones: { view: "View", fqdn: "Zone FQDN", type: "Zone Type", nsgroup: "NS Group", fwdgroup: "Forwarder Group",  comment: "Comment" },
-  }
+    records: { zone: t("importer.zone"), name: t("importer.name"), type: t("importer.type"), data: t("importer.data"), ttl: t("importer.ttl") },
+    zones: { view: t("importer.view"), fqdn: t("importer.fqdn"), type: t("importer.zoneType"), nsgroup: t("importer.nsGroup"), fwdgroup: t("importer.fwdGroup"), comment: t("importer.comment") },
+  };
 
   function analyzeZonesImport(form) {
     setLoader(true);
@@ -76,13 +78,13 @@ export default function DataImporter(props) {
 
   return (
     <>
-      <ContentHeader title="Data Importer">
-        <Button variant="contained" color="secondary" disabled={!Boolean(data.length)} startIcon={<PlayCircleFilled />} onClick={() => { setImportDialogOpen(true); }}>Start Import</Button>
+      <ContentHeader title={t("importer.title")}>
+        <Button variant="contained" color="secondary" disabled={!Boolean(data.length)} startIcon={<PlayCircleFilled />} onClick={() => { setImportDialogOpen(true); }}>{t("importer.startImport")}</Button>
         <DataImportDialog open={importDialogOpen} type={type} onSubmit={startImport} onClose={() => { setImportDialogOpen(false); }} />
-        <Button variant="contained" color="secondary" disabled={!Boolean(data.length)} startIcon={<DeleteIcon />} style={{marginLeft: 10}} onClick={() => { setData([]); }}>Clear</Button>
-        <Button variant="contained" color="primary" disabled={!canUse || (type !== 'zones' && Boolean(data.length))} startIcon={<AddCircle />} style={{marginLeft: 10}} onClick={() => { setZonesDialogOpen(true); }}>Add Zones</Button>
+        <Button variant="contained" color="secondary" disabled={!Boolean(data.length)} startIcon={<DeleteIcon />} style={{marginLeft: 10}} onClick={() => { setData([]); }}>{t("importer.clear")}</Button>
+        <Button variant="contained" color="primary" disabled={!canUse || (type !== 'zones' && Boolean(data.length))} startIcon={<AddCircle />} style={{marginLeft: 10}} onClick={() => { setZonesDialogOpen(true); }}>{t("importer.addZones")}</Button>
         <DataUploadDialog open={zonesDialogOpen} type="zones" onSubmit={analyzeZonesImport} onClose={() => { setZonesDialogOpen(false); }} />
-        <Button variant="contained" color="primary" disabled={!canUse || (type !== 'records' && Boolean(data.length))} startIcon={<AddCircle />} style={{marginLeft: 10}} onClick={() => { setRecordsDialogOpen(true); }}>Add Records</Button>
+        <Button variant="contained" color="primary" disabled={!canUse || (type !== 'records' && Boolean(data.length))} startIcon={<AddCircle />} style={{marginLeft: 10}} onClick={() => { setRecordsDialogOpen(true); }}>{t("importer.addRecords")}</Button>
         <DataUploadDialog open={recordsDialogOpen} type="records" onSubmit={analyzeRecordsImport} onClose={() => { setRecordsDialogOpen(false); }} />
       </ContentHeader>
       { data.length === 0 ? <></> : (

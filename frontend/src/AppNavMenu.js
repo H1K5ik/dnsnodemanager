@@ -11,13 +11,12 @@ import Typography from '@material-ui/core/Typography';
 import DnsIcon from '@material-ui/icons/Dns';
 import GroupWorkIcon from '@material-ui/icons/GroupWork';
 import AccountCircle from '@material-ui/icons/AccountCircle';
-import PlaylistPlayIcon from '@material-ui/icons/PlaylistPlay';
 import FastForwardIcon from '@material-ui/icons/FastForward';
 import LockOpenIcon from '@material-ui/icons/LockOpen';
 import DomainIcon from '@material-ui/icons/Domain';
 import GetAppIcon from '@material-ui/icons/GetApp';
 
-import { NotificationContext } from './common/NotificationProvider';
+import { useTranslation } from './common/LanguageContext';
 
 const useStyles = makeStyles( theme => ({
   drawer: {
@@ -34,28 +33,32 @@ const useStyles = makeStyles( theme => ({
   },
 }) );
 
-const navGroups = [
-  [
-    { key: 'servers', label: 'Servers', icon: <DnsIcon />, adminOnly: false },
-    { key: 'nsgroups', label: 'Nameserver Groups', icon: <GroupWorkIcon />, adminOnly: false },
-  ], [
-    { key: 'zones', label: 'DNS Zones', icon: <DomainIcon />, adminOnly: false },
-    { key: 'fwdgroups', label: 'Forwarder Groups', icon: <FastForwardIcon />, adminOnly: false },
-    { key: 'acls', label: 'Access Lists', icon: <LockOpenIcon />, adminOnly: false },
-    { key: 'importer', label: 'Data Import', icon: <GetAppIcon />, adminOnly: false },
-  ], [
-    { key: 'users', label: 'User Management', icon: <AccountCircle />, adminOnly: true },
-  ]
-];
+function getNavGroups(t) {
+  return [
+    [
+      { key: 'servers', label: t('nav.servers'), icon: <DnsIcon />, adminOnly: false },
+      { key: 'nsgroups', label: t('nav.nsgroups'), icon: <GroupWorkIcon />, adminOnly: false },
+    ], [
+      { key: 'zones', label: t('nav.zones'), icon: <DomainIcon />, adminOnly: false },
+      { key: 'fwdgroups', label: t('nav.fwdgroups'), icon: <FastForwardIcon />, adminOnly: false },
+      { key: 'acls', label: t('nav.acls'), icon: <LockOpenIcon />, adminOnly: false },
+      { key: 'importer', label: t('nav.importer'), icon: <GetAppIcon />, adminOnly: false },
+    ], [
+      { key: 'users', label: t('nav.users'), icon: <AccountCircle />, adminOnly: true },
+    ]
+  ];
+}
 
 export default function AppNavMenu(props) {
   const classes = useStyles();
   const history = useHistory();
+  const { t } = useTranslation();
+  const navGroups = getNavGroups(t);
 
   return (
     <Drawer variant="permanent" anchor="left" className={classes.drawer} classes={{paper: classes.drawerPaper}}>
       <div className={classes.toolbar}>
-        <Typography variant="h6" noWrap className={classes.appTitle}>DNS manager gr COD</Typography>
+        <Typography variant="h6" noWrap className={classes.appTitle}>{t('app.title')}</Typography>
       </div>
       <Divider />
       <List>

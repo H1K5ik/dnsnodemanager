@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
 import DialogContent from '@material-ui/core/DialogContent';
@@ -8,78 +8,71 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Switch from '@material-ui/core/Switch';
 import Button from '@material-ui/core/Button';
 
+import { useTranslation } from './common/LanguageContext';
+
 function FullTextField(props) {
   return <TextField fullWidth variant="outlined" margin="dense" {...props} />;
 }
 
-export default class ServerManagerDialog extends React.Component {
+const defaultData = {
+  dns_ip: "",
+  dns_fqdn: "",
+  name: "",
+  managed: true,
+  ssh_host: "",
+  ssh_user: "",
+  ssh_pass: "",
+  config_path: "/etc/bind/managed",
+};
 
-  static defaultProps = {
-    open: false,
-    new: false,
-    toggleFunc: () => { console.error("no dialog toggle function defined."); },
-    onSubmit: () => { console.error("no submit function defined."); },
-    data: {
-      dns_ip: "",
-      dns_fqdn: "",
-      name: "",
-      managed: true,
-      ssh_host: "",
-      ssh_user: "",
-      ssh_pass: "",
-      config_path: "/etc/bind/managed",
-    }
+export default function ServerManagerDialog(props) {
+  const { open = false, new: isNew = false, toggleFunc, onSubmit, data = defaultData } = props;
+  const [isBusy, setBusy] = useState(false);
+  const [isManaged, setManaged] = useState(Boolean(data.managed));
+  const dataRef = useRef({ ...data, managed: Boolean(data.managed) });
+
+  useEffect(() => {
+    dataRef.current = { ...data, managed: Boolean(data.managed) };
+    setManaged(Boolean(data.managed));
+  }, [data, open]);
+
+  const { t } = useTranslation();
+
+  const handleInputChange = (event) => {
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+    dataRef.current[event.target.name] = value;
+    if (event.target.name === 'managed') setManaged(value);
   };
 
-  state = {
-    isOpen: false,
-    isBusy: false,
-    isManaged: true,
+  const submitForm = () => {
+    setBusy(true);
+    onSubmit(dataRef.current).finally(() => setBusy(false));
   };
 
-  constructor(props) {
-    super(props);
-    this.data = {...props.data};
-    this.data.managed = Boolean(this.data.managed);
-    this.state.isManaged = Boolean(props.data.managed);
-  }
+  const pressKey = (event) => {
+    if (event.key === 'Enter') submitForm();
+  };
 
-  handleInputChange = event => {
-    let value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
-    this.data[event.target.name] = value;
-    if( event.target.name === 'managed' ) this.setState({isManaged: value});
-  }
-
-  submitForm = () => {
-    this.setState({isBusy: true});
-    this.props.onSubmit(this.data).finally( () => { this.setState({isBusy: false}); });
-  }
-
-  pressKey = event => {
-    if(event.key === 'Enter') this.submitForm();
-  }
-
-  render() {
-    return (
-      <Dialog open={this.props.open} onClose={this.props.toggleFunc} onKeyPress={this.pressKey}>
-        <DialogTitle>{ this.props.new ? 'Add Server' : 'Edit Server' }</DialogTitle>
-        <DialogContent>
-          <FullTextField autoFocus required name="name" label="Server Name" helperText="Short server alias, for internal use only." defaultValue={this.data.name} onChange={this.handleInputChange} />
-          <FullTextField required name="dns_ip" label="IP Address" defaultValue={this.data.dns_ip} onChange={this.handleInputChange} />
-          <FullTextField required name="dns_fqdn" label="NS FQDN" helperText="Fully qualified domain name of the dns server. Will be used for NS records." defaultValue={this.data.dns_fqdn} onChange={this.handleInputChange} />
-          <FormControlLabel control={<Switch checked={this.state.isManaged} name="managed" onChange={this.handleInputChange} color="primary" />} label="Managed Server" />
-          { this.state.isManaged && <>
-            <FullTextField name="ssh_host" label="SSH Host" defaultValue={this.data.ssh_host} onChange={this.handleInputChange} />
-            <FullTextField name="ssh_user" label="SSH User" defaultValue={this.data.ssh_user} onChange={this.handleInputChange} />
-            <FullTextField name="ssh_pass" label="SSH Password" type="password" helperText="Leave blank to use pubkey authentication only." defaultValue={this.data.ssh_pass} onChange={this.handleInputChange} />
-            <FullTextField name="config_path" label="Configuration Path" helperText="Destination path for managed configuration. Must be writable for ssh user." defaultValue={this.data.config_path} onChange={this.handleInputChange} />
-          </> }
-        </DialogContent>
-        <DialogActions>
-          <Button disabled={this.state.isBusy} onClick={this.props.toggleFunc}>Cancel</Button>
-          <Button disabled={this.state.isBusy} onClick={this.submitForm}>{ this.props.new ? 'Add Server' : 'Save Changes' }</Button>
-        </DialogActions>
-      </Dialog>
-    );
-  }
+  const d = dataRef.current;
+  return (
+    <Dialog open={open} onClose={toggleFunc} onKeyPress={pressKey}>
+      <DialogTitle>{ isNew ? t('servers.addServerTitle') : t('servers.editServer') }</DialogTitle>
+      <DialogContent>
+        <FullTextField autoFocus required name="name" label={t('servers.serverName')} helperText={t('servers.serverNameHelper')} defaultValue={d.name} onChange={handleInputChange} />
+        <FullTextField required name="dns_ip" label={t('servers.ipAddress')} defaultValue={d.dns_ip} onChange={handleInputChange} />
+        <FullTextField required name="dns_fqdn" label={t('servers.nsFqdn')} helperText={t('servers.nsFqdnHelper')} defaultValue={d.dns_fqdn} onChange={handleInputChange} />
+        <FormControlLabel control={<Switch checked={isManaged} name="managed" onChange={handleInputChange} color="primary" />} label={t('servers.managedServer')} />
+        { isManaged && <>
+          <FullTextField name="ssh_host" label={t('servers.sshHost')} defaultValue={d.ssh_host} onChange={handleInputChange} />
+          <FullTextField name="ssh_user" label={t('servers.sshUser')} defaultValue={d.ssh_user} onChange={handleInputChange} />
+          <FullTextField name="ssh_pass" label={t('servers.sshPass')} type="password" helperText={t('servers.sshPassHelper')} defaultValue={d.ssh_pass} onChange={handleInputChange} />
+          <FullTextField name="config_path" label={t('servers.configPath')} helperText={t('servers.configPathHelper')} defaultValue={d.config_path} onChange={handleInputChange} />
+        </> }
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={isBusy} onClick={toggleFunc}>{t('app.cancel')}</Button>
+        <Button disabled={isBusy} onClick={submitForm}>{ isNew ? t('servers.addServer') : t('servers.saveChanges') }</Button>
+      </DialogActions>
+    </Dialog>
+  );
 }

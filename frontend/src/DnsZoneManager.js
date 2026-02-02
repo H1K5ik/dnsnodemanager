@@ -26,6 +26,7 @@ import ViewColumn from '@material-ui/icons/ViewColumn';
 
 import DnsZoneDialog from "./DnsZoneDialog";
 import { AuthenticationContext } from "./common/AuthenticationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 const tableIcons = {
@@ -52,6 +53,7 @@ export default function DnsZoneManager(props) {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const api = useAPI();
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const canEdit = ['dnsop','dnsadmin','sysadmin'].includes(session.user.role);
 
   function deleteZones(event, zones) {
@@ -60,17 +62,17 @@ export default function DnsZoneManager(props) {
   }
 
   const tableColumns = [
-    { title: "Zone FQDN", field: "fqdn", render: rowData => <FqdnColumn id={rowData.ID} fqdn={rowData.fqdn} /> },
-    { title: "Network", field: "network" },
-    { title: "Zone Type", field: "type", width: 250, lookup: {authoritative: "Authoritative Zone", forward: "Forward Zone", stub: "Stub Zone"} },
-    { title: "Forwarding Group", field: "forwarder_group_name", width: 250 },
-    { title: "NS Group / Master", field: "ns_group_name", render: rowData => `${rowData.ns_group_name} / ${rowData.master}` },
-    { title: "Comment", field: "comment" },
+    { title: t("dns.zoneFqdn"), field: "fqdn", render: rowData => <FqdnColumn id={rowData.ID} fqdn={rowData.fqdn} /> },
+    { title: t("dns.network"), field: "network" },
+    { title: t("dns.zoneType"), field: "type", width: 250, lookup: {authoritative: t("dns.authoritative"), forward: t("dns.forward"), stub: t("dns.stub")} },
+    { title: t("dns.forwardingGroup"), field: "forwarder_group_name", width: 250 },
+    { title: t("dns.nsGroupMaster"), field: "ns_group_name", render: rowData => `${rowData.ns_group_name} / ${rowData.master}` },
+    { title: t("dns.comment"), field: "comment" },
   ];
 
   const tableActions = canEdit ? [
-    { icon: forwardRef((props, ref) => <AddCircle {...props} ref={ref} />), tooltip: 'New Zone', isFreeAction: true, onClick: () => { setDialogOpen(true); } },
-    { icon: forwardRef((props, ref) => <DeleteIcon {...props} ref={ref} />), tooltip: 'Delete Zones', onClick: deleteZones },
+    { icon: forwardRef((props, ref) => <AddCircle {...props} ref={ref} />), tooltip: t('dns.newZone'), isFreeAction: true, onClick: () => { setDialogOpen(true); } },
+    { icon: forwardRef((props, ref) => <DeleteIcon {...props} ref={ref} />), tooltip: t('dns.deleteZones'), onClick: deleteZones },
   ] : [];
 
   const tableOptions = {

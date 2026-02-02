@@ -364,12 +364,14 @@ module.exports = class ZoneProvider {
     return { message: "DNS zones deleted", auditData: zoneNames };
   }
 
-  findReverseZone = async ipaddr => {
+  findReverseZone = async (ipaddr, viewName = null) => {
     let subnet, reverseZone, reverseZoneFQDN, ptrName;
     for( let bits = 24; bits >= 8; bits -= 8 ) {
       subnet = ip.cidrSubnet(ipaddr + "/" + String(bits));
       reverseZoneFQDN = APP.util.convertIP4netToFQDN(subnet.networkAddress + "/" + String(bits));
-      reverseZone = await this.db('zone').where('fqdn', reverseZoneFQDN).first();
+      const query = this.db('zone').where('fqdn', reverseZoneFQDN);
+      if( viewName != null ) query.where('view', viewName);
+      reverseZone = await query.first();
       if( reverseZone ) {
         const parts = ip.toBuffer(ipaddr);
         switch(bits) {
@@ -439,9 +441,9 @@ module.exports = class ZoneProvider {
     if( ! Boolean(rs.frozen) && acls.length > 0 ) throw Error('This zone currently allows dynamic updates. Freeze the zone first in order to make changes.');
     // Type-based checks
     APP.util.validateRecordSanity(data.type, data.name, data.data);
-    // For A-Records: try to find reverse zone and add ptr record
+    // For A-Records: try to find reverse zone (same view as forward zone) and add ptr record
     if( data.addPTR && data.type === 'a' ) {
-      const reverseZone = await this.findReverseZone(data.data);
+      const reverseZone = await this.findReverseZone(data.data, rs.view);
       if( reverseZone === false ) throw Error("No reverse zone exists for this IP address");
       
       // Проверяем доступ к обратной зоне тоже
@@ -534,9 +536,9 @@ module.exports = class ZoneProvider {
       }
     }
     
-    // Update PTR record
+    // Update PTR record (same view as forward zone)
     if( data.addPTR && data.type === 'a' ) {
-      const reverseZone = await this.findReverseZone(data.data);
+      const reverseZone = await this.findReverseZone(data.data, rs.view);
       if( reverseZone === false ) throw Error("No reverse zone exists for this IP address");
       
       // Проверяем доступ к обратной зоне тоже

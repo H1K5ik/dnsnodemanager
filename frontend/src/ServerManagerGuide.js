@@ -5,6 +5,8 @@ import FormControl from '@material-ui/core/FormControl';
 import InputLabel from '@material-ui/core/InputLabel';
 import MenuItem from '@material-ui/core/MenuItem';
 
+import { useTranslation } from './common/LanguageContext';
+
 function CodeBlock(props) {
   const css = {
     margin: "1em",
@@ -19,6 +21,7 @@ function CodeBlock(props) {
 
 export default function ServerManagerGuide(props) {
   const [dist, setDist] = React.useState('debian');
+  const { t } = useTranslation();
 
   function handleDistChange(event) {
     setDist(event.target.value);
@@ -31,32 +34,32 @@ export default function ServerManagerGuide(props) {
   return (
     <>
       <FormControl variant="outlined">
-        <InputLabel>Linux Family</InputLabel>
-        <Select defaultValue={dist} onChange={handleDistChange} label="Linux Family">
-          <MenuItem value="debian">Debian / Ubuntu</MenuItem>
-          <MenuItem value="rhel">RHEL / CentOS</MenuItem>
+        <InputLabel>{t('guide.linuxFamily')}</InputLabel>
+        <Select defaultValue={dist} onChange={handleDistChange} label={t('guide.linuxFamily')}>
+          <MenuItem value="debian">{t('guide.debian')}</MenuItem>
+          <MenuItem value="rhel">{t('guide.rhel')}</MenuItem>
         </Select>
       </FormControl>
-      <p>These are the recommended steps to prepare managed dns servers for configuration sync</p>
-      <p>Add a new user on the dns server, which is a member of the bind group</p>
+      <p>{t('guide.intro')}</p>
+      <p>{t('guide.addUser')}</p>
       <CodeBlock>useradd -m -G {getUser()} dnsmanager</CodeBlock>
-      <p>Optionally set a password</p>
+      <p>{t('guide.optionalPass')}</p>
       <CodeBlock>passwd dnsmanager</CodeBlock>
-      <p>Create a directory for configuration files that is owned by the new user and the bind group and writable by both. You can freely choose the directory path, but keep in mind that SELinux or AppArmor may restrict you to use some subpath of the default config location.</p>
+      <p>{t('guide.createDir')}</p>
       <CodeBlock>
         mkdir --mode=775 /etc/{getUser()}/managed<br />
         chown dnsmanager:{getUser()} /etc/{getUser()}/managed
       </CodeBlock>
-      <p>Install the ssh key to the users authorized_keys file. Use the SSH KEY INFO button to retrieve the key from DnsNM.</p>
+      <p>{t('guide.installKey')}</p>
       <CodeBlock>
         su dnsmanager<br />
         mkdir --mode=700 ~/.ssh<br />
         vi ~/.ssh/authorized_keys
         chmod 600 ~/.ssh/authorized_keys
       </CodeBlock>
-      <p>Now you can add the server to the server manager.</p>
-      <p>Make sure that the DnsNM host can connect to your managed DNS nodes and login through ssh. Consider firewall restrictions, tcpwrappers and user/group restrictions in sshd_config.</p>
-      <p>After the first configuration sync, <b>include the deployed file (managedconfig.conf) in your main named.conf</b> file.</p>
+      <p>{t('guide.addServer')}</p>
+      <p>{t('guide.firewall')}</p>
+      <p>{t('guide.includeFile')}</p>
     </>
   );
 }

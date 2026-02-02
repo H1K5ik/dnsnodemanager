@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from './common/LanguageContext';
 import TableRow from '@material-ui/core/TableRow';
 import TableCell from '@material-ui/core/TableCell';
 import IconButton from '@material-ui/core/IconButton';
@@ -14,6 +15,7 @@ import useAPI from './common/api';
 export default function UserRow(props) {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [accessDialogOpen, setAccessDialogOpen] = React.useState(false);
+  const { t } = useTranslation();
   const api = useAPI();
 
   function updateRow(data) {
@@ -35,17 +37,17 @@ export default function UserRow(props) {
   return (
     <TableRow>
       <TableCell>{props.data.name}</TableCell>
-      <TableCell>{props.roles[props.data.role]}</TableCell>
+      <TableCell>{t('roles.' + props.data.role)}</TableCell>
       <TableCell component="th" scope="row">
-        <Tooltip title="Edit User">
+        <Tooltip title={t('users.editUser')}>
           <IconButton aria-haspopup="true" color="primary" children={<EditIcon />} onClick={() => { setDialogOpen(true); }} />
         </Tooltip>
         {isDnsOperator && (
-          <Tooltip title="Manage Nameserver Group Access">
+          <Tooltip title={t('users.manageNsAccess')}>
             <IconButton aria-haspopup="true" color="primary" children={<GroupWorkIcon />} onClick={() => { setAccessDialogOpen(true); }} />
           </Tooltip>
         )}
-        <Tooltip title="Delete User">
+        <Tooltip title={t('users.deleteUser')}>
           <span>
             <IconButton aria-haspopup="true" color="primary" disabled={!props.deletable} children={<DeleteIcon />} onClick={deleteRow} />
           </span>

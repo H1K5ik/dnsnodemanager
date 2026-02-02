@@ -12,6 +12,7 @@ import InputLabel from '@material-ui/core/InputLabel';
 import MenuItem from '@material-ui/core/MenuItem';
 import ArrowForward from '@material-ui/icons/ArrowForward';
 
+import { useTranslation } from './common/LanguageContext';
 import useAPI from './common/api';
 
 export default function DataUploadDialog(props) {
@@ -21,6 +22,7 @@ export default function DataUploadDialog(props) {
   const [nsGroups, setNsGroups] = React.useState([]);
   const [fwdGroups, setFwdGroups] = React.useState([]);
   const [views, setViews] = React.useState([]);
+  const { t } = useTranslation();
   const api = useAPI();
 
   function getGroupsAndViews() {
@@ -61,16 +63,16 @@ export default function DataUploadDialog(props) {
 
   return (
     <Dialog open={props.open} onClose={props.onClose} TransitionProps={{ onEntering: getGroupsAndViews }}>
-      <DialogTitle>Import {props.type}</DialogTitle>
+      <DialogTitle>{t("importer.importType", { type: props.type })}</DialogTitle>
       <DialogContent>
         <form id="import-file-form" encType="multipart/form-data">
-          { type === 'csv' && <Box m={1}>CSV Import Sample: <Link href={"samples/" + props.type + ".csv"} download><ArrowForward color="disabled" fontSize="small" style={{verticalAlign: "top"}} /> Download</Link></Box> }
+          { type === 'csv' && <Box m={1}>{t("importer.csvSample")} <Link href={"samples/" + props.type + ".csv"} download><ArrowForward color="disabled" fontSize="small" style={{verticalAlign: "top"}} /> {t("importer.download")}</Link></Box> }
           <Box m={1}>
             <FormControl variant="outlined" margin="dense">
-              <InputLabel>File Type</InputLabel>
-              <Select name="filetype" defaultValue="csv" label="File Type" onChange={changeType}>
+              <InputLabel>{t("importer.fileType")}</InputLabel>
+              <Select name="filetype" defaultValue="csv" label={t("importer.fileType")} onChange={changeType}>
                 <MenuItem value="csv">CSV</MenuItem>
-                <MenuItem value="bind">{ props.type === 'records' ? 'Bind Zonefile' : 'Bind Config' }</MenuItem>
+                <MenuItem value="bind">{ props.type === 'records' ? t("importer.bindZonefile") : t("importer.bindConfig") }</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -78,24 +80,24 @@ export default function DataUploadDialog(props) {
             <>
             <Box m={1}>
               <FormControl variant="outlined" margin="dense">
-                <InputLabel>View</InputLabel>
-                <Select name="view" defaultValue="default" label="View">
+                <InputLabel>{t("importer.view")}</InputLabel>
+                <Select name="view" defaultValue="default" label={t("importer.view")}>
                   { views.map( (view, index) => <MenuItem key={index} value={view.name}>{view.name}</MenuItem> ) }
                 </Select>
               </FormControl>
             </Box>
             <Box m={1}>
               <FormControl variant="outlined" margin="dense">
-                <InputLabel>Nameserver Group</InputLabel>
-                <Select name="nsgroup" label="Nameserver Group" style={{minWidth:180}} defaultValue={nsGroups[0].name}>
+                <InputLabel>{t("importer.nsGroup")}</InputLabel>
+                <Select name="nsgroup" label={t("importer.nsGroup")} style={{minWidth:180}} defaultValue={nsGroups[0].name}>
                   { nsGroups.map( (nsgroup, index) => <MenuItem key={index} value={nsgroup.name}>{nsgroup.name}</MenuItem> ) }
                 </Select>
               </FormControl>
             </Box>
             <Box m={1}>
               <FormControl variant="outlined" margin="dense">
-                <InputLabel>Forwarder Group</InputLabel>
-                <Select name="fwdgroup" label="Forwarder Group" style={{minWidth:180}} defaultValue={fwdGroups[0].name}>
+                <InputLabel>{t("importer.fwdGroup")}</InputLabel>
+                <Select name="fwdgroup" label={t("importer.fwdGroup")} style={{minWidth:180}} defaultValue={fwdGroups[0].name}>
                   { fwdGroups.map( (group, index) => <MenuItem key={index} value={group.name}>{group.name}</MenuItem> ) }
                 </Select>
               </FormControl>
@@ -105,17 +107,17 @@ export default function DataUploadDialog(props) {
           <Box m={1}>
             <label htmlFor="upload-file">
               <input style={{ display: 'none' }} id="upload-file" name="file" type="file" onChange={handleChange} />
-              <Button variant="contained" component="span">Select File</Button>
+              <Button variant="contained" component="span">{t("importer.selectFile")}</Button>
             </label>
           </Box>
           <Box m={1}>
-            { file !== null && "File: " + file }
+            { file !== null && t("importer.fileLabel", { name: file }) }
           </Box>
         </form>
       </DialogContent>
       <DialogActions>
-        <Button disabled={busy} onClick={close}>Cancel</Button>
-        <Button disabled={busy} onClick={submit}>Analyze File</Button>
+        <Button disabled={busy} onClick={close}>{t("app.cancel")}</Button>
+        <Button disabled={busy} onClick={submit}>{t("importer.analyzeFile")}</Button>
       </DialogActions>
     </Dialog>
   );

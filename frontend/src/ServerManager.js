@@ -28,6 +28,7 @@ import ContentHeader from './ContentHeader';
 import ServerManagerGuide from './ServerManagerGuide';
 import { AuthenticationContext } from "./common/AuthenticationProvider";
 import { NotificationContext } from './common/NotificationProvider';
+import { useTranslation } from './common/LanguageContext';
 import useAPI from './common/api'
 
 export default function ServerManager(props) {
@@ -43,6 +44,7 @@ export default function ServerManager(props) {
   const api = useAPI();
 
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const canEdit = ['dnsadmin','sysadmin'].includes(session.user.role);
 
   function getServers() {
@@ -73,7 +75,7 @@ export default function ServerManager(props) {
   }
 
   function deleteServer(data) {
-    if( window.confirm("Really delete this server from the configuration?") ) {
+    if( window.confirm(t("servers.deleteConfirm")) ) {
       return api.deleteServer(data).then(getServers);
     }
   }
@@ -85,11 +87,11 @@ export default function ServerManager(props) {
       if( result.success ) {
         setHealthCheckData(result);
         setHealthCheckOpen(true);
-        notifier.setNotification("success", "SSH connection working properly!");
+        notifier.setNotification("success", t("servers.sshWorking"));
       } else {
         setHealthCheckData(result);
         setHealthCheckOpen(true);
-        notifier.setNotification("error", "SSH connection broken!");
+        notifier.setNotification("error", t("servers.sshBroken"));
       }
       // Reload serverlist if we have a different result
       if( Boolean(data.last_status) !== result.success ) getServers();
@@ -100,32 +102,31 @@ export default function ServerManager(props) {
 
   return (
     <>
-      <ContentHeader title="Manage Nameservers">
-        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<InfoIcon />} onClick={() => { setGuideOpen(true); }}>Managed Config Guide</Button>
+      <ContentHeader title={t("servers.title")}>
+        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<InfoIcon />} onClick={() => { setGuideOpen(true); }}>{t("servers.managedConfigGuide")}</Button>
         <Dialog open={guideOpen} onClose={() => { setGuideOpen(false); }}>
-          <DialogTitle>Managed Config Guide</DialogTitle>
+          <DialogTitle>{t("servers.managedConfigGuide")}</DialogTitle>
           <DialogContent>
             <ServerManagerGuide />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => { setGuideOpen(false); }}>Close</Button>
+            <Button onClick={() => { setGuideOpen(false); }}>{t("app.close")}</Button>
           </DialogActions>
         </Dialog>
-        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<VpnKey />} style={{marginLeft: 10}} onClick={() => { setSshInfoOpen(true); }}>SSH Key Info</Button>
+        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<VpnKey />} style={{marginLeft: 10}} onClick={() => { setSshInfoOpen(true); }}>{t("servers.sshKeyInfo")}</Button>
         <Dialog open={sshInfoOpen} TransitionProps={{ onEntering: getSshPubKey }} maxWidth="xs">
-          <DialogTitle>SSH Key Info</DialogTitle>
+          <DialogTitle>{t("servers.sshKeyInfo")}</DialogTitle>
           <DialogContent>
             <p>
-              Bind configuration files are distributed to managed servers through SSH.<br />
-              You can either deposit the ssh users password for each server or authorize this public key on the target systems for PubKey Authentication (recommended for production):
+              {t("servers.sshKeyInfoText")}
             </p>
             <Box>{sshPubKey === null ? <LinearProgress /> : <TextField fullWidth inputProps={{readOnly: true}} variant="outlined" defaultValue={sshPubKey} />}</Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => { setSshInfoOpen(false); }}>Close</Button>
+            <Button onClick={() => { setSshInfoOpen(false); }}>{t("app.close")}</Button>
           </DialogActions>
         </Dialog>
-        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} style={{marginLeft: 10}} onClick={() => { setAddDialogOpen(true); }}>Add Server</Button>
+        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} style={{marginLeft: 10}} onClick={() => { setAddDialogOpen(true); }}>{t("servers.addServer")}</Button>
         <ServerManagerDialog new open={addDialogOpen} onSubmit={addServer} toggleFunc={() => { setAddDialogOpen(false); }} />
       </ContentHeader>
       <TableContainer component={Paper}>
@@ -133,13 +134,13 @@ export default function ServerManager(props) {
           <TableHead>
             <TableRow>
               <TableCell>&nbsp;</TableCell>
-              <TableCell>Server Name</TableCell>
-              <TableCell>NS FQDN</TableCell>
-              <TableCell>IP Address</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>SSH Health</TableCell>
-              <TableCell>Config Sync</TableCell>
+              <TableCell>{t("servers.serverName")}</TableCell>
+              <TableCell>{t("servers.nsFqdn")}</TableCell>
+              <TableCell>{t("servers.ipAddress")}</TableCell>
+              <TableCell>{t("servers.type")}</TableCell>
+              <TableCell>{t("servers.status")}</TableCell>
+              <TableCell>{t("servers.sshHealth")}</TableCell>
+              <TableCell>{t("servers.configSync")}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -151,20 +152,20 @@ export default function ServerManager(props) {
       </TableContainer>
       { loading && ( <Box m={2}><LinearProgress /></Box> ) }
       <Dialog open={healthCheckOpen} onClose={() => { setHealthCheckOpen(false); }}>
-        <DialogTitle>HealthCheck Result</DialogTitle>
+        <DialogTitle>{t("servers.healthCheckResult")}</DialogTitle>
         <DialogContent>
           { healthCheckData !== null && (
             <>
-              <Box m={2}>Checking SSH Connection and config managability for {healthCheckData.server} ...</Box>
-              <HealthCheckSection success={healthCheckData.sshConnection} label="SSH Login" detail="Attemped to login through SSH to remote system" />
-              <HealthCheckSection success={healthCheckData.confDirWritable} label="Configuration directory writabl" detail="Configured directory must be writable for the management user" />
-              <HealthCheckSection success={healthCheckData.groupMembership} label="Bind/Named group membership" detail="The management user must be member of either 'bind' or 'named' group" />
-              <HealthCheckSection success={healthCheckData.rndcCommands} label="RNDC commands executable" detail="Trying to execute '/usr/sbin/rndc status' to verify rndc function" />
+              <Box m={2}>{t("servers.checkingSsh", { server: healthCheckData.server })}</Box>
+              <HealthCheckSection success={healthCheckData.sshConnection} label={t("servers.sshLogin")} detail={t("servers.sshLoginDetail")} />
+              <HealthCheckSection success={healthCheckData.confDirWritable} label={t("servers.confDirWritable")} detail={t("servers.confDirDetail")} />
+              <HealthCheckSection success={healthCheckData.groupMembership} label={t("servers.groupMembership")} detail={t("servers.groupMembershipDetail")} />
+              <HealthCheckSection success={healthCheckData.rndcCommands} label={t("servers.rndcCommands")} detail={t("servers.rndcDetail")} />
             </>
           ) }
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setHealthCheckOpen(false); }}>Close</Button>
+          <Button onClick={() => { setHealthCheckOpen(false); }}>{t("app.close")}</Button>
         </DialogActions>
       </Dialog>
     </>

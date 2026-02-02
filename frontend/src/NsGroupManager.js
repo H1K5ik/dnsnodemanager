@@ -17,6 +17,7 @@ import NsGroupRow from './NsGroupRow';
 import NsGroupDialog from './NsGroupDialog';
 
 import { AuthenticationContext } from "./common/AuthenticationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 export default function NsGroupManager(props) {
@@ -28,6 +29,7 @@ export default function NsGroupManager(props) {
   const api = useAPI();
 
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const canEdit = ['dnsadmin','sysadmin'].includes(session.user.role);
 
   React.useEffect(updateNsGroups, []);  // eslint-disable-line
@@ -69,8 +71,8 @@ export default function NsGroupManager(props) {
 
   return (
     <>
-      <ContentHeader title="Nameserver Groups">
-        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={toggleDialog}>Add Nameserver Group</Button>
+      <ContentHeader title={t("nsgroups.title")}>
+        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={toggleDialog}>{t("nsgroups.addGroup")}</Button>
         <NsGroupDialog new defaultName="" open={addGroupDialog.open} blocked={busy} onClose={toggleDialog} onInput={handleDialogInput} onSubmit={addGroup} />
       </ContentHeader>
       <TableContainer component={Paper}>
@@ -78,13 +80,13 @@ export default function NsGroupManager(props) {
           <TableHead>
             <TableRow>
               <TableCell />
-              <TableCell>Group Name</TableCell>
-              <TableCell>Members</TableCell>
+              <TableCell>{t("nsgroups.groupName")}</TableCell>
+              <TableCell>{t("nsgroups.members")}</TableCell>
               <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
-            { nsLoading ? <></> : nsGroups.map( row => <NsGroupRow key={row.ID} servers={servers} data={row} readOnly={!canEdit} onDelete={deleteGroup} onUpdate={updateNsGroups} api={api} /> ) }
+            { nsLoading ? <></> : nsGroups.map( row => <NsGroupRow key={row.ID} servers={servers} data={row} readOnly={!canEdit} onDelete={deleteGroup} onUpdate={updateNsGroups} api={api} t={t} /> ) }
           </TableBody>
         </Table>
       </TableContainer>

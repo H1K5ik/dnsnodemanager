@@ -17,6 +17,7 @@ import FwdGroupRow from './FwdGroupRow';
 import FwdGroupDialog from './FwdGroupDialog';
 
 import { AuthenticationContext } from "./common/AuthenticationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 export default function FwdGroupManager(props) {
@@ -26,6 +27,7 @@ export default function FwdGroupManager(props) {
   const api = useAPI();
 
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const canEdit = ['dnsop','dnsadmin','sysadmin'].includes(session.user.role);
 
   React.useEffect(updateFwdGroups, []);  // eslint-disable-line
@@ -49,16 +51,16 @@ export default function FwdGroupManager(props) {
 
   return (
     <>
-      <ContentHeader title="Forwarder Groups">
-        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={() => { setFwdGroupDialogOpen(true); }}>Add Forwarder Group</Button>
+      <ContentHeader title={t("fwd.title")}>
+        <Button variant="contained" color="primary" disabled={!canEdit} startIcon={<AddCircle />} onClick={() => { setFwdGroupDialogOpen(true); }}>{t("fwd.addGroup")}</Button>
         <FwdGroupDialog new open={fwdGroupDialogOpen} onClose={() => { setFwdGroupDialogOpen(false); }} onSubmit={addFwdGroup} />
       </ContentHeader>
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Group Name</TableCell>
-              <TableCell>Forwarders</TableCell>
+              <TableCell>{t("fwd.groupName")}</TableCell>
+              <TableCell>{t("fwd.forwarders")}</TableCell>
               <TableCell />
             </TableRow>
           </TableHead>

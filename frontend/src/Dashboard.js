@@ -2,10 +2,12 @@ import React from "react";
 import Box from '@material-ui/core/Box';
 import LinearProgress from '@material-ui/core/LinearProgress';
 
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from "./common/api";
 
 export default function Dashboard(props) {
   const [stats, setStats] = React.useState(null);
+  const { t } = useTranslation();
   const api = useAPI();
 
   function getStats() {
@@ -16,10 +18,10 @@ export default function Dashboard(props) {
 
   return stats === null ? <LinearProgress /> : (
     <Box>
-      <Box>Server Count: {stats.serverCount}</Box>
-      <Box>View Count: {stats.viewCount}</Box>
-      <Box>Zone Count: {stats.zoneCount}</Box>
-      <Box>Record Count: {stats.recordCount}</Box>
+      <Box>{t('dashboard.serverCount')}: {stats.serverCount}</Box>
+      <Box>{t('dashboard.viewCount')}: {stats.viewCount}</Box>
+      <Box>{t('dashboard.zoneCount')}: {stats.zoneCount}</Box>
+      <Box>{t('dashboard.recordCount')}: {stats.recordCount}</Box>
     </Box>
   );
 

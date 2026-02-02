@@ -20,9 +20,11 @@ import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
 
 import NsGroupDialog from './NsGroupDialog';
+import { useTranslation } from './common/LanguageContext';
 
 function NsGroupMemberRow(props) {
   const [menuAnchor, setMenuAnchor] = React.useState(null);
+  const { t } = useTranslation();
 
   return (
     <TableRow>
@@ -32,10 +34,10 @@ function NsGroupMemberRow(props) {
         </IconButton>
         <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => { setMenuAnchor(null); }}>
           <MenuItem onClick={() => { props.onToggleHidden(props.data); setMenuAnchor(null); }}>
-            {props.data.hidden ? "Unset Hidden" : "Set Hidden"}
+            {props.data.hidden ? t("nsgroups.unsetHidden") : t("nsgroups.setHidden")}
           </MenuItem>
           <MenuItem onClick={() => { props.onRemove(props.data); setMenuAnchor(null); }}>
-            Remove From Group
+            {t("nsgroups.removeFromGroup")}
           </MenuItem>
         </Menu>
       </TableCell>
@@ -140,7 +142,7 @@ export default class NsGroupRow extends React.Component {
             <Collapse in={this.state.expanded} timeout="auto" unmountOnExit>
               <Box margin={1}>
                 <Typography variant="h6" gutterBottom component="div">
-                  Nameservers of {this.props.data.name}
+                  {this.props.t ? this.props.t('nsgroups.nameserversOf', { name: this.props.data.name }) : 'Nameservers of ' + this.props.data.name}
                 </Typography>
                 <Table size="small">
                   <TableHead>

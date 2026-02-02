@@ -7,6 +7,7 @@ import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 
 import { AuthenticationContext } from "./common/AuthenticationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 export default function LoginScreen(props) {
@@ -14,6 +15,7 @@ export default function LoginScreen(props) {
   const [open, setOpen] = React.useState(true);
   const [cred, setCred] = React.useState({username: '', password: ''});
   const session = React.useContext(AuthenticationContext);
+  const { t } = useTranslation();
   const api = useAPI();
 
   function handleInputChange(event) {
@@ -41,13 +43,13 @@ export default function LoginScreen(props) {
 
   return (
     <Dialog open={open} onKeyPress={pressKey}>
-      <DialogTitle>Authentication</DialogTitle>
+      <DialogTitle>{t('login.title')}</DialogTitle>
       <DialogContent>
-        <TextField fullWidth variant="outlined" name="username" label="Username" value={cred.username} onChange={handleInputChange} style={{marginBottom:"0.5em"}} />
-        <TextField fullWidth variant="outlined" type="password" name="password" label="Password" value={cred.password} onChange={handleInputChange} />
+        <TextField fullWidth variant="outlined" name="username" label={t('login.username')} value={cred.username} onChange={handleInputChange} style={{marginBottom:"0.5em"}} />
+        <TextField fullWidth variant="outlined" type="password" name="password" label={t('login.password')} value={cred.password} onChange={handleInputChange} />
       </DialogContent>
       <DialogActions>
-        <Button variant="contained" color="primary" disabled={busy} onClick={doLogin}>Login</Button>
+        <Button variant="contained" color="primary" disabled={busy} onClick={doLogin}>{t('login.login')}</Button>
       </DialogActions>
     </Dialog>
   );
