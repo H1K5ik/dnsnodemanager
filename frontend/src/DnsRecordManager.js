@@ -161,6 +161,16 @@ export default function DnsRecordManager(props) {
     } );
   }
 
+  function confirmDeleteWithoutPtr() {
+    if ( ! pendingDeleteIds.length ) return;
+    api.deleteDnsRecords({ id_list: pendingDeleteIds, deleteWithoutPtr: true }).then( result => {
+      setDeletePtrDialogOpen(false);
+      setPendingDeleteIds([]);
+      setPendingPtrRecords([]);
+      if ( result !== false ) getRecords();
+    } );
+  }
+
   function freezeZone() {
     api.freezeDnsZone(zoneInfo).then(getZoneInfoAndRecords);
   }
@@ -274,6 +284,7 @@ export default function DnsRecordManager(props) {
             </DialogContent>
             <DialogActions>
               <Button onClick={() => { setDeletePtrDialogOpen(false); setPendingDeleteIds([]); setPendingPtrRecords([]); }}>{t("app.cancel")}</Button>
+              <Button onClick={confirmDeleteWithoutPtr}>{t("dns.deleteRecordsOnly")}</Button>
               <Button color="primary" variant="contained" onClick={confirmDeleteWithPtr}>{t("dns.deletePtrConfirm")}</Button>
             </DialogActions>
           </Dialog>

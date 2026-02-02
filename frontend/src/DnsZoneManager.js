@@ -1,6 +1,12 @@
 import React, {forwardRef} from "react";
 import { Link } from "react-router-dom";
 import Tooltip from '@material-ui/core/Tooltip';
+import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
+import Dialog from '@material-ui/core/Dialog';
+import DialogActions from '@material-ui/core/DialogActions';
+import DialogContent from '@material-ui/core/DialogContent';
+import DialogTitle from '@material-ui/core/DialogTitle';
 import AddCircle from '@material-ui/icons/AddCircle';
 import DeleteIcon from '@material-ui/icons/Delete';
 import ArrowForward from '@material-ui/icons/ArrowForward';
@@ -51,6 +57,9 @@ const tableIcons = {
 
 export default function DnsZoneManager(props) {
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [deleteZonePtrDialogOpen, setDeleteZonePtrDialogOpen] = React.useState(false);
+  const [pendingZoneIds, setPendingZoneIds] = React.useState([]);
+  const [pendingPtrRecords, setPendingPtrRecords] = React.useState([]);
   const api = useAPI();
   const session = React.useContext(AuthenticationContext);
   const { t } = useTranslation();
@@ -58,7 +67,35 @@ export default function DnsZoneManager(props) {
 
   function deleteZones(event, zones) {
     const zone_ids = zones.map( zone => zone.ID );
-    api.deleteZones(zone_ids).then(props.onRefresh);
+    api.deleteZones(zone_ids).then( result => {
+      if ( result && result.code === 'ZONE_PTR_EXISTS_DELETE' ) {
+        setPendingZoneIds(zone_ids);
+        setPendingPtrRecords(result.ptrRecords || []);
+        setDeleteZonePtrDialogOpen(true);
+      } else if ( result !== false ) {
+        props.onRefresh();
+      }
+    } );
+  }
+
+  function confirmDeleteZonesWithPtr() {
+    if ( ! pendingZoneIds.length ) return;
+    api.deleteZones({ id_list: pendingZoneIds, deletePtr: true }).then( result => {
+      setDeleteZonePtrDialogOpen(false);
+      setPendingZoneIds([]);
+      setPendingPtrRecords([]);
+      if ( result !== false ) props.onRefresh();
+    } );
+  }
+
+  function confirmDeleteZonesOnly() {
+    if ( ! pendingZoneIds.length ) return;
+    api.deleteZones({ id_list: pendingZoneIds, deleteWithoutPtr: true }).then( result => {
+      setDeleteZonePtrDialogOpen(false);
+      setPendingZoneIds([]);
+      setPendingPtrRecords([]);
+      if ( result !== false ) props.onRefresh();
+    } );
   }
 
   const tableColumns = [
@@ -97,6 +134,33 @@ export default function DnsZoneManager(props) {
         onClose={() => { setDialogOpen(false); }}
         onRefresh={props.onRefresh}
       />
+      <Dialog open={deleteZonePtrDialogOpen} onClose={() => { setDeleteZonePtrDialogOpen(false); setPendingZoneIds([]); setPendingPtrRecords([]); }}>
+        <DialogTitle>{t("dns.deleteZonePtrTitle")}</DialogTitle>
+        <DialogContent>
+          <p>{t("dns.deleteZonePtrMessage")}</p>
+          { pendingPtrRecords.length > 0 && (
+            <Box component="div" mt={2}>
+              <Box component="span" fontWeight="fontWeightMedium">{t("dns.deleteZonePtrListTitle")}</Box>
+              <Box component="ul" style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
+                { pendingPtrRecords.map((ptr, idx) => (
+                  <li key={idx}>
+                    <Box component="span" fontFamily="monospace">{ptr.ip}</Box>
+                    {' → '}
+                    <Box component="span" fontFamily="monospace">{ptr.ptrData}</Box>
+                    {' '}
+                    <Box component="span" color="textSecondary">({ptr.reverseZoneFqdn})</Box>
+                  </li>
+                )) }
+              </Box>
+            </Box>
+          ) }
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDeleteZonePtrDialogOpen(false); setPendingZoneIds([]); setPendingPtrRecords([]); }}>{t("app.cancel")}</Button>
+          <Button onClick={confirmDeleteZonesOnly}>{t("dns.deleteZonesOnly")}</Button>
+          <Button color="primary" variant="contained" onClick={confirmDeleteZonesWithPtr}>{t("dns.deleteZonePtrConfirm")}</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

@@ -327,22 +327,77 @@ module.exports = class ZoneProvider {
   }
 
   delete = async (data, request) => {
-    const zones = await this.db('zone').whereIn('ID', data);
-    
+    const idList = Array.isArray(data) ? data : (data.id_list || []);
+    const deletePtr = !Array.isArray(data) && data.deletePtr;
+    const deleteWithoutPtr = !Array.isArray(data) && data.deleteWithoutPtr;
+    if ( ! idList.length ) throw Error("No zones to delete");
+
+    const zones = await this.db('zone').whereIn('ID', idList);
+
     // Если пользователь - DNS Operator, проверяем доступ ко всем зонам
     if (request && request.user && request.user.role === 'dnsop') {
       const accessibleGroups = await this.db('user_ns_group_access')
         .where('user_id', request.user.ID)
         .select('group_id');
       const groupIds = accessibleGroups.map(g => g.group_id);
-      
+
       for (const zone of zones) {
         if (!groupIds.includes(zone.ns_group)) {
           throw Error(`You don't have access to zone ${zone.fqdn}`);
         }
       }
     }
-  
+
+    // Проверяем: у удаляемых прямых зон есть A-записи, на которые ссылаются PTR в обратных зонах
+    const ptrRecords = [];
+    for ( const zone of zones ) {
+      if ( zone.fqdn.endsWith('.in-addr.arpa') ) continue;
+      const aRecords = await this.db('record').where({ zone_id: zone.ID, type: 'a' }).select('name', 'data');
+      for ( const rec of aRecords ) {
+        const reverseZone = await this.findReverseZone(rec.data, zone.view);
+        if ( reverseZone === false ) continue;
+        const ptrData = rec.name + '.' + zone.fqdn + '.';
+        const existingPtr = await this.db('record').where({
+          zone_id: reverseZone.zone.ID,
+          type: 'ptr',
+          name: reverseZone.ptrName,
+          data: ptrData
+        }).first();
+        if ( existingPtr ) {
+          ptrRecords.push({
+            ip: rec.data,
+            ptrData: ptrData,
+            ptrName: reverseZone.ptrName,
+            reverseZoneId: reverseZone.zone.ID,
+            reverseZoneFqdn: reverseZone.zone.fqdn,
+            zoneFqdn: zone.fqdn
+          });
+        }
+      }
+    }
+
+    if ( ptrRecords.length > 0 && ! deletePtr && ! deleteWithoutPtr ) {
+      const err = new Error("Some zones have A records with PTR records in reverse zones. Delete those PTRs too?");
+      err.code = 'ZONE_PTR_EXISTS_DELETE';
+      err.ptrRecords = ptrRecords;
+      throw err;
+    }
+
+    // Удаляем PTR в обратных зонах, если пользователь подтвердил
+    if ( deletePtr && ptrRecords.length > 0 ) {
+      const touchedReverseZoneIds = new Set();
+      for ( const ptr of ptrRecords ) {
+        await this.db('record').where({
+          zone_id: ptr.reverseZoneId,
+          type: 'ptr',
+          name: ptr.ptrName,
+          data: ptr.ptrData
+        }).del();
+        touchedReverseZoneIds.add(ptr.reverseZoneId);
+      }
+      for ( const zoneId of touchedReverseZoneIds ) await this.touch(zoneId);
+    }
+
     const deleteQueue = [];
     for (const zone of zones) {
       const serverIds = await this.db('ns_group_member').where('group_id', zone.ns_group).select('server_id');
@@ -357,9 +412,9 @@ module.exports = class ZoneProvider {
 
     const nsGroups = [...new Set(zones.map(zone => zone.ns_group))];
     for( let id of nsGroups ) await APP.api.nsGroupProvider.queueConfigSync(id);
-    await this.db('zone').whereIn('ID', data).del();
-    await this.db('record').whereIn('zone_id', data).del();
-    await this.db('acl_usage').whereIn('user_id', data).del();
+    await this.db('zone').whereIn('ID', idList).del();
+    await this.db('record').whereIn('zone_id', idList).del();
+    await this.db('acl_usage').whereIn('user_id', idList).del();
     const zoneNames = zones.map(z => z.fqdn).join(', ');
     return { message: "DNS zones deleted", auditData: zoneNames };
   }
@@ -608,6 +663,7 @@ module.exports = class ZoneProvider {
   deleteRecords = async (data, request) => {
     const idList = Array.isArray(data) ? data : (data.id_list || []);
     const deletePtr = !Array.isArray(data) && data.deletePtr;
+    const deleteWithoutPtr = !Array.isArray(data) && data.deleteWithoutPtr;
     if ( ! idList.length ) throw Error("No records to delete");
 
     const zone = await this.db('record').where('record.ID', idList[0]).join('zone', 'zone.ID', 'record.zone_id').select('zone.ns_group', 'zone.ID', 'zone.frozen').first();
@@ -648,7 +704,7 @@ module.exports = class ZoneProvider {
       if ( existingPtr ) aRecordsWithPtr.push({ record: rec, reverseZone });
     }
 
-    if ( aRecordsWithPtr.length > 0 && ! deletePtr ) {
+    if ( aRecordsWithPtr.length > 0 && ! deletePtr && ! deleteWithoutPtr ) {
       const err = new Error("Some A records have PTR records in the reverse zone. Delete PTRs too?");
       err.code = 'PTR_EXISTS_DELETE';
       err.ptrRecords = aRecordsWithPtr.map(({ record: rec, reverseZone }) => ({

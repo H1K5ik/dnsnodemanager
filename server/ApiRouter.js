@@ -255,6 +255,15 @@ module.exports = {
       });
       return;
     }
+    if (error && error.code === 'ZONE_PTR_EXISTS_DELETE') {
+      response.json({
+        success: false,
+        code: 'ZONE_PTR_EXISTS_DELETE',
+        message: error.message,
+        ptrRecords: error.ptrRecords || []
+      });
+      return;
+    }
     this.errorResponse(response, error.toString());
   },
 
