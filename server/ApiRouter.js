@@ -242,6 +242,19 @@ module.exports = {
 
   handleApiError(response, error) {
     console.log(error);
+    if (error && error.code === 'PTR_EXISTS') {
+      response.json({ success: false, code: 'PTR_EXISTS', message: error.message });
+      return;
+    }
+    if (error && error.code === 'PTR_EXISTS_DELETE') {
+      response.json({
+        success: false,
+        code: 'PTR_EXISTS_DELETE',
+        message: error.message,
+        ptrRecords: error.ptrRecords || []
+      });
+      return;
+    }
     this.errorResponse(response, error.toString());
   },
 

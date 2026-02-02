@@ -47,6 +47,9 @@ export default function useAPI() {
       return false;
     }
     if( ! response.data.success ) {
+      if (response.data.code === 'PTR_EXISTS' || response.data.code === 'PTR_EXISTS_DELETE') {
+        return response.data;
+      }
       notifier.setNotification("error", response.data.message);
       return false;
     }

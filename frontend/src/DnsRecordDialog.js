@@ -10,6 +10,7 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import Switch from '@material-ui/core/Switch';
 
 import { NotificationContext } from "./common/NotificationProvider";
+import { useTranslation } from "./common/LanguageContext";
 import useAPI from './common/api';
 
 function FullTextField(props) {
@@ -20,8 +21,10 @@ export default function DnsRecordDialog(props) {
   const [data, setData] = React.useState({...props.data, zone_id: props.zoneId, type: props.recordType});
   const [busy, setBusy] = React.useState(false);
   const [inheritTTL, setInheritTTL] = React.useState(props.data.ttl === null);
+  const [ptrReplaceDialogOpen, setPtrReplaceDialogOpen] = React.useState(false);
   const notifier = React.useContext(NotificationContext);
   const api = useAPI();
+  const { t } = useTranslation();
 
   function handleInputChange(event) {
     let key   = event.target.name;
@@ -37,17 +40,27 @@ export default function DnsRecordDialog(props) {
     }
   }
 
+  function doAddRecord(replacePTR = false) {
+    const payload = { name: data.name, zone_id: data.zone_id, type: data.type, data: data.data, ttl: data.ttl };
+    if( data.type === 'a' ) {
+      payload.addPTR = Boolean(data.addPTR);
+      if (replacePTR) payload.replacePTR = true;
+    }
+    return api.addDnsRecord(payload);
+  }
+
   function submitForm() {
     setBusy(true);
-    const payload = { name: data.name, zone_id: data.zone_id, type: data.type, data: data.data, ttl: data.ttl };
-    if( data.type === 'a' ) payload.addPTR = Boolean(data.addPTR);
     if( props.new ) {
-      api.addDnsRecord(payload).then( result => {
+      doAddRecord().then( result => {
         setBusy(false);
-        if( result ) {
+        if (result && result.code === 'PTR_EXISTS') {
+          setPtrReplaceDialogOpen(true);
+          return;
+        }
+        if( result && result.success !== false ) {
           props.onClose();
           props.onRefresh();
-          // reset dialog data
           setData(prevData => ({ ...props.data, zone_id: props.zoneId, type: props.recordType }));
           setInheritTTL(true);
         }
@@ -55,7 +68,7 @@ export default function DnsRecordDialog(props) {
     } else {
       api.updateDnsRecord({ ...data, addPTR: data.type === 'a' ? Boolean(data.addPTR) : undefined }).then( result => {
         setBusy(false);
-        if( result ) {
+        if( result && result.success !== false ) {
           props.onClose();
           props.onRefresh();
         }
@@ -63,11 +76,26 @@ export default function DnsRecordDialog(props) {
     }
   }
 
+  function confirmReplacePtr() {
+    setBusy(true);
+    setPtrReplaceDialogOpen(false);
+    doAddRecord(true).then( result => {
+      setBusy(false);
+      if( result && result.success !== false ) {
+        props.onClose();
+        props.onRefresh();
+        setData(prevData => ({ ...props.data, zone_id: props.zoneId, type: props.recordType }));
+        setInheritTTL(true);
+      }
+    } );
+  }
+
   function pressKey(event) {
     if(event.key === 'Enter') submitForm();
   }
 
   return (
+    <>
     <Dialog open={props.open} onClose={props.onClose} TransitionProps={{ onEntering: () => { setData(prevData => ({...prevData, type: props.recordType})); } }} onKeyPress={pressKey}>
       <DialogTitle>{ props.new ? 'New ' + notifier.appInfo.rrTypes[props.recordType] : 'Edit ' + notifier.appInfo.rrTypes[props.recordType]  }</DialogTitle>
       <DialogContent>
@@ -82,10 +110,19 @@ export default function DnsRecordDialog(props) {
         { ! inheritTTL && <FullTextField required={!inheritTTL} disabled={inheritTTL} defaultValue={data.ttl} name="ttl" label="TTL" onChange={handleInputChange} /> }
       </DialogContent>
       <DialogActions>
-        <Button disabled={busy} onClick={props.onClose}>Cancel</Button>
-        <Button disabled={busy} onClick={submitForm}>{ props.new ? 'Add Record' : 'Save Changes' }</Button>
+        <Button disabled={busy} onClick={props.onClose}>{t('app.cancel')}</Button>
+        <Button disabled={busy} onClick={submitForm}>{ props.new ? t('dns.addRecord') : t('common.saveChanges') }</Button>
       </DialogActions>
     </Dialog>
+    <Dialog open={ptrReplaceDialogOpen} onClose={() => setPtrReplaceDialogOpen(false)}>
+      <DialogTitle>{t('dns.ptrExistsTitle')}</DialogTitle>
+      <DialogContent>{t('dns.ptrExistsMessage')}</DialogContent>
+      <DialogActions>
+        <Button onClick={() => setPtrReplaceDialogOpen(false)}>{t('app.cancel')}</Button>
+        <Button color="primary" variant="contained" onClick={confirmReplacePtr}>{t('dns.ptrReplace')}</Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }
 

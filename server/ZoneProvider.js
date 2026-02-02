@@ -457,6 +457,15 @@ module.exports = class ZoneProvider {
         }
       }
       
+      const existingPtr = await this.db('record').where({type: 'ptr', zone_id: reverseZone.zone.ID, name: reverseZone.ptrName}).first();
+      if (existingPtr && !data.replacePTR) {
+        const err = new Error("PTR record already exists for this IP in the reverse zone. Replace?");
+        err.code = 'PTR_EXISTS';
+        throw err;
+      }
+      if (existingPtr && data.replacePTR) {
+        await this.db('record').where({type: 'ptr', zone_id: reverseZone.zone.ID, name: reverseZone.ptrName}).delete();
+      }
       await this.db('record').insert({type: 'ptr', name: reverseZone.ptrName, data:data.name + '.' + rs.fqdn + '.', zone_id: reverseZone.zone.ID, ttl: data.ttl});
       await this.touch(reverseZone.zone.ID);
     }
@@ -597,10 +606,14 @@ module.exports = class ZoneProvider {
   }
 
   deleteRecords = async (data, request) => {
-    const zone = await this.db('record').where('record.ID', data[0]).join('zone', 'zone.ID', 'record.zone_id').select('zone.ns_group', 'zone.ID', 'zone.frozen').first();
+    const idList = Array.isArray(data) ? data : (data.id_list || []);
+    const deletePtr = !Array.isArray(data) && data.deletePtr;
+    if ( ! idList.length ) throw Error("No records to delete");
+
+    const zone = await this.db('record').where('record.ID', idList[0]).join('zone', 'zone.ID', 'record.zone_id').select('zone.ns_group', 'zone.ID', 'zone.frozen').first();
     // exists?
     if( ! zone ) throw Error("Record doesnt exist or is a system record");
-    
+
     // Если пользователь - DNS Operator, проверяем доступ к зоне
     if (request && request.user && request.user.role === 'dnsop') {
       const hasAccess = await this.db('user_ns_group_access')
@@ -611,15 +624,60 @@ module.exports = class ZoneProvider {
         throw Error("You don't have access to this zone");
       }
     }
-    
+
     // frozen?
     const acls = await this.getAcls(zone.ID);
     if( ! Boolean(zone.frozen) && acls.length > 0 ) throw Error('This zone currently allows dynamic updates. Freeze the zone first in order to make changes.');
+
+    // Проверяем, есть ли среди удаляемых A-записей такие, у которых есть PTR в обратной зоне
+    const records = await this.db('record').whereIn('record.ID', idList)
+      .join('zone', 'zone.ID', 'record.zone_id')
+      .select('record.ID', 'record.type', 'record.name', 'record.data', 'zone.fqdn', 'zone.view');
+    const aRecordsWithPtr = [];
+    for ( const rec of records ) {
+      if ( rec.type !== 'a' ) continue;
+      const reverseZone = await this.findReverseZone(rec.data, rec.view);
+      if ( reverseZone === false ) continue;
+      const ptrData = rec.name + '.' + rec.fqdn + '.';
+      const existingPtr = await this.db('record').where({
+        zone_id: reverseZone.zone.ID,
+        type: 'ptr',
+        name: reverseZone.ptrName,
+        data: ptrData
+      }).first();
+      if ( existingPtr ) aRecordsWithPtr.push({ record: rec, reverseZone });
+    }
+
+    if ( aRecordsWithPtr.length > 0 && ! deletePtr ) {
+      const err = new Error("Some A records have PTR records in the reverse zone. Delete PTRs too?");
+      err.code = 'PTR_EXISTS_DELETE';
+      err.ptrRecords = aRecordsWithPtr.map(({ record: rec, reverseZone }) => ({
+        ip: rec.data,
+        ptrData: rec.name + '.' + rec.fqdn + '.',
+        reverseZoneFqdn: reverseZone.zone.fqdn
+      }));
+      throw err;
+    }
+
+    // Удаляем PTR в обратных зонах, если пользователь подтвердил
+    if ( deletePtr && aRecordsWithPtr.length > 0 ) {
+      for ( const { record: rec, reverseZone } of aRecordsWithPtr ) {
+        const ptrData = rec.name + '.' + rec.fqdn + '.';
+        await this.db('record').where({
+          zone_id: reverseZone.zone.ID,
+          type: 'ptr',
+          name: reverseZone.ptrName,
+          data: ptrData
+        }).del();
+        await this.touch(reverseZone.zone.ID);
+      }
+    }
+
     // exec deletion
-    let chunks = _.chunk(data, 999);
+    let chunks = _.chunk(idList, 999);
     for( let i = 0; i < chunks.length; i++ ) await this.db('record').whereIn('ID', chunks[i]).del();
     await this.touch(zone.ID);
-    return "Records were deleted"
+    return "Records were deleted";
   }
 
 }

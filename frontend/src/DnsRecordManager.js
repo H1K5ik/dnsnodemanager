@@ -78,6 +78,9 @@ export default function DnsRecordManager(props) {
   const [previewDialogOpen, setPreviewDialogOpen] = React.useState(false);
   const [configDialogOpen, setConfigDialogOpen] = React.useState(false);
   const [ttlDialogOpen, setTtlDialogOpen] = React.useState(false);
+  const [deletePtrDialogOpen, setDeletePtrDialogOpen] = React.useState(false);
+  const [pendingDeleteIds, setPendingDeleteIds] = React.useState([]);
+  const [pendingPtrRecords, setPendingPtrRecords] = React.useState([]);
   const [selectedRows, setSelectedRows] = React.useState([]);
   const { t } = useTranslation();
   const [zoneInfo, setZoneInfo] = React.useState(null);
@@ -136,8 +139,26 @@ export default function DnsRecordManager(props) {
     let ids = [];
     if( rows.length ) {
       ids = rows.map(row => { return row.ID });
-      api.deleteDnsRecords(ids).then(getRecords);
+      api.deleteDnsRecords(ids).then( result => {
+        if ( result && result.code === 'PTR_EXISTS_DELETE' ) {
+          setPendingDeleteIds(ids);
+          setPendingPtrRecords(result.ptrRecords || []);
+          setDeletePtrDialogOpen(true);
+        } else if ( result !== false ) {
+          getRecords();
+        }
+      } );
     }
+  }
+
+  function confirmDeleteWithPtr() {
+    if ( ! pendingDeleteIds.length ) return;
+    api.deleteDnsRecords({ id_list: pendingDeleteIds, deletePtr: true }).then( result => {
+      setDeletePtrDialogOpen(false);
+      setPendingDeleteIds([]);
+      setPendingPtrRecords([]);
+      if ( result !== false ) getRecords();
+    } );
   }
 
   function freezeZone() {
@@ -230,6 +251,32 @@ export default function DnsRecordManager(props) {
           </Menu>
           <DnsRecordDialog new open={addDialogOpen} onRefresh={getRecords} onClose={() => { setAddDialogOpen(false); }} zoneId={id} recordType={addDialogType} />
           <DnsRecordTtlDialog open={ttlDialogOpen} onRefresh={getRecords} onClose={() => { setTtlDialogOpen(false); }} records={selectedRows} />
+          <Dialog open={deletePtrDialogOpen} onClose={() => { setDeletePtrDialogOpen(false); setPendingDeleteIds([]); setPendingPtrRecords([]); }}>
+            <DialogTitle>{t("dns.deletePtrTitle")}</DialogTitle>
+            <DialogContent>
+              <p>{t("dns.deletePtrMessage")}</p>
+              { pendingPtrRecords.length > 0 && (
+                <Box component="div" mt={2}>
+                  <Box component="span" fontWeight="fontWeightMedium">{t("dns.deletePtrListTitle")}</Box>
+                  <Box component="ul" style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
+                    { pendingPtrRecords.map((ptr, idx) => (
+                      <li key={idx}>
+                        <Box component="span" fontFamily="monospace">{ptr.ip}</Box>
+                        {' → '}
+                        <Box component="span" fontFamily="monospace">{ptr.ptrData}</Box>
+                        {' '}
+                        <Box component="span" color="textSecondary">({ptr.reverseZoneFqdn})</Box>
+                      </li>
+                    )) }
+                  </Box>
+                </Box>
+              ) }
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => { setDeletePtrDialogOpen(false); setPendingDeleteIds([]); setPendingPtrRecords([]); }}>{t("app.cancel")}</Button>
+              <Button color="primary" variant="contained" onClick={confirmDeleteWithPtr}>{t("dns.deletePtrConfirm")}</Button>
+            </DialogActions>
+          </Dialog>
           { renderEditDialog() }
         </>
         ) }
