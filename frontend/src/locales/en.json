@@ -1,6 +1,6 @@
 {
   "app.title": "DNS manager gr COD",
-  "app.special": "Special for Efimenko - ",
+  "app.special": "Special - ",
   "app.logout": "Logout",
   "app.syncStatus": "Sync Status",
   "app.syncNotOnAll": "DNS Configuration isn't synchronized on all servers.",
