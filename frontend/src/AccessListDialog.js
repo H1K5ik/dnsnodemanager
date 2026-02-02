@@ -13,11 +13,14 @@ export default function AccessListDialog(props) {
   const [busy, setBusy] = React.useState(false);
   const { t } = useTranslation();
 
+  React.useEffect(() => {
+    if (props.open) setData({...props.data});
+  }, [props.open, props.data]);
+
   function handleInput(event) {
     const name = event.currentTarget.name;
     const value = event.currentTarget.value;
     setData( prevData => ({...prevData, [name]: value}) );
-    console.log(data);
   }
 
   function submit() {
@@ -35,8 +38,8 @@ export default function AccessListDialog(props) {
     <Dialog open={props.open} onClose={props.onClose} onKeyPress={pressKey}>
       <DialogTitle>{props.new ? t('acls.dialogTitleCreate') : t('acls.dialogTitleUpdate')}</DialogTitle>
       <DialogContent>
-        <TextField autoFocus required fullWidth variant="outlined" margin="dense" name="name" label={t('acls.aclName')} defaultValue={props.data.name} onChange={handleInput} />
-        <TextField required fullWidth variant="outlined" margin="dense" name="members" label={t('acls.ipAddresses')} helperText={t('acls.membersHelper')} defaultValue={props.data.members} onChange={handleInput} />
+        <TextField autoFocus required fullWidth variant="outlined" margin="dense" name="name" label={t('acls.aclName')} value={data.name} onChange={handleInput} />
+        <TextField required fullWidth variant="outlined" margin="dense" name="members" label={t('acls.ipAddresses')} helperText={t('acls.membersHelper')} value={data.members} onChange={handleInput} multiline minRows={3} maxRows={12} style={{ fontFamily: 'monospace' }} />
       </DialogContent>
       <DialogActions>
         <Button disabled={busy} onClick={props.onClose}>{t('app.cancel')}</Button>

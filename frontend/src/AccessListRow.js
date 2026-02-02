@@ -28,7 +28,7 @@ export default function AccessListRow(props) {
   return (
     <TableRow>
       <TableCell>{props.data.name}</TableCell>
-      <TableCell>{props.data.members}</TableCell>
+      <TableCell style={{ whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: 420 }}>{props.data.members}</TableCell>
       <TableCell component="th" scope="row">
         <IconButton aria-haspopup="true" color="primary" disabled={props.readOnly} children={<EditIcon />} onClick={() => { setDialogOpen(true); }} />
         <IconButton aria-haspopup="true" color="primary" disabled={props.readOnly} children={<DeleteIcon />} onClick={deleteAcl} />
