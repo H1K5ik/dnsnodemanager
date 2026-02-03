@@ -15,11 +15,23 @@ module.exports = class BindZoneFile {
   buildZoneFile() {
     const zone = this.info;
     const ttl  = zone.ttl || zone.view.ttl;
+    const zoneOrigin = zone.fqdn + '.';
     // Header, SOA, NS Records
-    let string = "$ORIGIN " + zone.fqdn + ".\n$TTL " + ttl + "\n" + this.buildSoaRecord() + "\n";
+    let string = "$ORIGIN " + zoneOrigin + "\n$TTL " + ttl + "\n" + this.buildSoaRecord() + "\n";
     // NS Records
     for( let i = 0; i < this.info.nameservers.length; i++ ) {
       string += this.buildRecord('@', 'NS', this.info.nameservers[i].dns_fqdn + '.');
+    }
+    // Glue A records for in-bailiwick NS (required by named-checkzone)
+    for( let i = 0; i < this.info.nameservers.length; i++ ) {
+      const ns = this.info.nameservers[i];
+      if( !ns.dns_ip ) continue;
+      const nsFqdn = ns.dns_fqdn.endsWith('.') ? ns.dns_fqdn : ns.dns_fqdn + '.';
+      const inZone = nsFqdn === zoneOrigin || nsFqdn.endsWith('.' + zoneOrigin);
+      if( inZone ) {
+        const relName = nsFqdn === zoneOrigin ? '@' : nsFqdn.slice(0, nsFqdn.length - zoneOrigin.length).replace(/\.$/, '') || '@';
+        string += this.buildRecord(relName, 'A', ns.dns_ip);
+      }
     }
     // Regular Records
     for( let j = 0; j < this.records.length; j++ ) {
