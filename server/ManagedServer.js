@@ -482,6 +482,7 @@ module.exports = class ManagedServer {
   }
 
   async getServerZones(zoneId = null) {
+    this.nameservers = await this.getNsGroupMatrix();
     const query = this.db('zone')
       .join('ns_group_member', 'ns_group_member.group_id', 'zone.ns_group')
       .leftJoin('forwarder', 'zone.forwarder_group', 'forwarder.ID')
