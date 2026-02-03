@@ -386,7 +386,8 @@ module.exports = class ManagedServer {
           rs = await this.syncZone(zone.fqdn, zone.view);
           if( ! rs ) console.log('Dynamic zone sync failed: ' + zone.fqdn);
         }
-        // На мастере с уже существующим файлом — проверяем serial (динамические зоны)
+        // На мастере с уже существующим файлом — проверяем serial только для динамических зон
+        // Для обычных зон всегда пушим собранный файл (glue/NS могли измениться при смене IP сервера)
         if( zone.primary ) {
           try {
             console.log(`Downloading ${this.getConfigPath()}/zones/${zoneFile.filename} from ${this.info.name}`);
@@ -397,13 +398,16 @@ module.exports = class ManagedServer {
               rollout = false;
               throw Error(zone.fqdn + ": Dynamic zone serial is higher than expected. Freeze and sync this zone before making changes!");
             }
-            rollout = parser.getSerial() < zone.soa_serial;
+            if( zone.dynamic ) rollout = parser.getSerial() < zone.soa_serial;
             console.log(`Remote serial ${parser.getSerial()}, local serial ${zone.soa_serial}, rollout=${rollout}`);
           } catch(e) {
             console.log("File download failed: " + e.toString());
           }
         }
         if( rollout ) {
+          await this.db('zone').where('ID', zone.ID).increment('soa_serial', 1);
+          zone.soa_serial += 1;
+          zoneFile = new BindZoneFile(zone, records.filter(r => r.zone_id === zone.ID));
           zoneFile.writeTo(`${zonesDir}/${zoneFile.filename}`);
           zoneFiles.push(zoneFile);
         }
