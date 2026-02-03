@@ -200,7 +200,10 @@ module.exports = class ManagedServer {
     console.log("Checkzone stdout:", zoneCheck.stdout);
     console.log("Checkzone stderr:", zoneCheck.stderr);
 
-    if( zoneCheck.code ) throw Error('Failed to load zonefile ' + zoneFile.info.fqdn + '. aborted.');
+    if( zoneCheck.code ) {
+      const detail = [zoneCheck.stdout, zoneCheck.stderr].filter(Boolean).join(' ') || 'exit code ' + zoneCheck.code;
+      throw Error('Failed to load zonefile ' + zoneFile.info.fqdn + ': ' + detail);
+    }
 
     return true;
   }
